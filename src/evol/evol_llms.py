@@ -17,6 +17,8 @@ Use openai for now.
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 
+SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant."
+
 class BaseLLM(ABC):
     """Base class for LLM wrappers"""
     
@@ -48,7 +50,10 @@ class OpenAILLM(BaseLLM):
         if self.model_name in self.CHAT_MODELS:
             response = await self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                    ],
                 **self.model_kwargs
             )
             return response.choices[0].message.content
@@ -60,46 +65,17 @@ class OpenAILLM(BaseLLM):
             )
             return response.choices[0].text.strip()
 
+LLM_MODELS = {
+    "OPENAI_LLM": OpenAILLM.CHAT_MODELS | OpenAILLM.INSTRUCT_MODELS,
+}
 
-# class ClaudeLLM(BaseLLM):
-#     def __init__(self, model_name: str = "claude-3-sonnet", **kwargs):
-#         super().__init__(model_name, **kwargs)
-#         from anthropic import AsyncAnthropic
-#         self.client = AsyncAnthropic()
-
-#     async def generate(self, prompt: str) -> str:
-#         response = await self.client.messages.create(
-#             model=self.model_name,
-#             messages=[{"role": "user", "content": prompt}],
-#             **self.model_kwargs
-#         )
-#         return response.content[0].text
-
-# class GeminiLLM(BaseLLM):
-#     def __init__(self, model_name: str = "gemini-pro", **kwargs):
-#         super().__init__(model_name, **kwargs)
-#         import google.generativeai as genai
-#         self.client = genai
-
-#     async def generate(self, prompt: str) -> str:
-#         model = self.client.GenerativeModel(self.model_name)
-#         response = await model.generate_content_async(prompt)
-#         return response.text
-
-# class QwenLLM(BaseLLM):
-#     def __init__(self, model_name: str = "qwen-max", **kwargs):
-#         super().__init__(model_name, **kwargs)
-#         from dashscope import Generation
-#         self.client = Generation()
-
-#     async def generate(self, prompt: str) -> str:
-#         response = await self.client.call(
-#             model=self.model_name,
-#             prompt=prompt,
-#             **self.model_kwargs
-#         )
-#         return response.output.text
-
+async def llm_generate(model_name: str, prompt: str, **kwargs) -> str:
+    if model_name in LLM_MODELS["OPENAI_LLM"]:
+        llm = OpenAILLM(model_name=model_name, **kwargs)
+    else:
+        raise ValueError(f"Unknown model: {model_name}. Must be one of {LLM_MODELS['OPENAI_LLM']}")
+    response = await llm.generate(prompt)
+    return response
 
 
 async def main():
@@ -117,16 +93,6 @@ async def main():
     llm = llms[name]
     response = await llm.generate(prompt)
     print(f"{name} Response:\n{response}\n")
-
-    # # Test each model
-    # for name, llm in llms.items():
-    #     try:
-    #         print(f"\nTesting {name}...")
-    #         response = await llm.generate(prompt)
-    #         print(f"{name} Response:\n{response}\n")
-    #         print("-" * 50)
-    #     except Exception as e:
-    #         print(f"Error with {name}: {str(e)}")
 
 if __name__ == "__main__":
     import asyncio
