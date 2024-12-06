@@ -183,14 +183,14 @@ class QuestionEvol:
 			json.dump(prompt_variants, f)
 
 if __name__ == "__main__":
-    async def main():
-        strategy_name = "SUPPRESS_REFUSAL"
-        question_evol = QuestionEvol()
-        prompt_variants = await question_evol.generate_prompt_variants_with_strategy(strategy_name, num_seed=3, num_variants=10)
-        print(prompt_variants)
-        question_evol.save_prompt_variants(strategy_name.lower(), prompt_variants)
-
-    asyncio.run(main())
+	async def main(strategy_name):
+		question_evol = QuestionEvol()
+		prompt_variants = await question_evol.generate_prompt_variants_with_strategy(strategy_name, num_seed=10, num_variants=500)
+		question_evol.save_prompt_variants(strategy_name.lower(), prompt_variants)	
+	asyncio.run(main("SUPPRESS_REFUSAL"))
+	asyncio.run(main("DISTRACTED_QUESTION"))
+	asyncio.run(main("AFFIRMATIVE_OUTPUT"))
+	asyncio.run(main("ROLE_PLAY_STORY"))
 
 
 
