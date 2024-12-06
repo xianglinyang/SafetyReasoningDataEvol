@@ -15,7 +15,6 @@ Use openai for now.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
 
 SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant."
 
