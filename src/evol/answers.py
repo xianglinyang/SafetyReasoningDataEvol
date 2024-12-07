@@ -14,7 +14,7 @@ from src.evol.questions import __strategies__
 class AnswerStrategy:
 	def __init__(self):
 		self.name = "AnswerStrategy"
-		self.template_path = "data/answer_variants/answers"
+		self.template_path = "data/prompt_variants/answers"
 		self.templates = {}
 		self._strategies = __strategies__
 	
