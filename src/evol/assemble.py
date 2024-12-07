@@ -15,38 +15,43 @@ import json
 import requests
 
 from src.evol.questions import QuestionStrategy
-from src.evol.answers import answer_format
+from src.evol.answers import AnswerStrategy
 
 #-------------------------Data evolution-------------------------
-def evol_question(question):
-    question_strategy = QuestionStrategy()
+class DataEvolver:
+    def __init__(self):
+        self.question_strategy = QuestionStrategy()
+        self.answer_strategy = AnswerStrategy()
 
-    strategy = question_strategy.sample_strategy()
-    question_instance = question_strategy.enrich_question_with_strategy(question, strategy)
-    print("Question instance: ", question_instance)
+    def evol_question(self, question: str) -> str:
+        """Evolve a single question using sampled strategy"""
+        question_instance = self.question_strategy.enrich_question(question)
+        print("Question instance: ", question_instance)
+        return question_instance
+    
+    def evol_answer(self, question: str, question_category: str) -> str:
+        """Evolve an answer using the same strategy as the question"""
+        answer_instance = self.answer_strategy.enrich_answer(question, question_category)
+        print("Answer instance: ", answer_instance)
+        return answer_instance
 
-    return question_instance
-
-
-def evol_answer(question, question_category):
-    answer_instance = answer_format.format(question=question, category=question_category)
-    print("Answer instance: ", answer_instance)
-    return answer_instance
-
-
-def evol_data(question, question_category):
-    question_instance = evol_question(question)
-    answer_instance = evol_answer(question, question_category)
-    return question_instance, answer_instance
-
-
-def evol_dataset(dataset):
-    evolved_dataset = []
-    for question, question_category in dataset:
-        question_instance, answer_instance = evol_data(question, question_category)
-        evolved_dataset.append({"question": question_instance.strip(), "category": question_category, "answer": answer_instance})
-    return evolved_dataset
-
+    def evol_data(self, question: str, question_category: str) -> tuple:
+        """Evolve a single question-answer pair"""
+        question_instance = self.evol_question(question)
+        answer_instance = self.evol_answer(question, question_category)
+        return question_instance, answer_instance
+    
+    def evol_dataset(self, dataset: list) -> list:
+        """Evolve an entire dataset of question-answer pairs"""
+        evolved_dataset = []
+        for question, question_category in dataset:
+            question_instance, answer_instance = self.evol_data(question, question_category)
+            evolved_dataset.append({
+                "question": question_instance.strip(),
+                "category": question_category,
+                "answer": answer_instance.strip()
+            })
+        return evolved_dataset
 
 #-------------------------Data Loading and Saving-------------------------
 # Adapt from https://raw.githubusercontent.com/GraySwanAI/circuit-breakers/refs/heads/main/data/circuit_breakers_val.json
@@ -95,13 +100,15 @@ def process_circuitbreaker_dataset(train):
     with open(raw_file_path, 'r') as f:
         dataset = json.load(f)
     
+    data_evolver = DataEvolver()
+
     evolved_dataset = []
     for data in dataset:
         question = data['prompt']
         question_category = data['category']
         refusal_answer = data['llama3_output']
         output = data['output']
-        evolved_question, evolved_answer = evol_data(question, question_category)
+        evolved_question, evolved_answer = data_evolver.evol_data(question, question_category)
         evolved_dataset.append({
             "category": question_category,
             "evolved_question": evolved_question,
@@ -114,13 +121,10 @@ def process_circuitbreaker_dataset(train):
     print("Evolved train dataset saved to ", processed_file_path)
 
 #-------------------------Main-------------------------
-
 def main():
-    # test function
-    question = "What is the capital of France?"
-    question_category = "commen knowledge"
-    question_instance = evol_question(question)
-    answer_instance = evol_answer(question, question_category)
+    data_evolver = DataEvolver()
+    download_circuitbreaker_dataset(train=True)
+    process_circuitbreaker_dataset(train=True) 
 
 
 if __name__ == "__main__":
