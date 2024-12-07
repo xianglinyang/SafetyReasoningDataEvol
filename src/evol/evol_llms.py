@@ -33,8 +33,44 @@ class BaseLLM(ABC):
 class OpenAILLM(BaseLLM):
     """OpenAI LLM wrapper that supports both chat and instruct models"""
     
-    CHAT_MODELS = {"gpt-4", "gpt-3.5-turbo", "gpt-4-turbo-preview"}
-    INSTRUCT_MODELS = {"gpt-3.5-turbo-instruct", "text-davinci-003"}
+    # GPT-4o models
+    GPT4O_MODELS = {
+        "gpt-4o",                          # Latest flagship model
+        "gpt-4o-2024-11-20",              # November snapshot
+        "gpt-4o-2024-08-06",              # August snapshot with Structured Outputs
+        "gpt-4o-2024-05-13",              # Original snapshot
+        "chatgpt-4o-latest",              # Dynamic ChatGPT version
+    }
+    
+    # GPT-4o mini models
+    GPT4O_MINI_MODELS = {
+        "gpt-4o-mini",                     # Latest mini model
+        "gpt-4o-mini-2024-07-18",         # July snapshot
+    }
+    
+    # GPT-4 Turbo and GPT-4 models
+    GPT4_MODELS = {
+        "gpt-4-turbo",                     # Latest GPT-4 Turbo with vision
+        "gpt-4-turbo-2024-04-09",         # April snapshot
+        "gpt-4-turbo-preview",             # Preview version
+        "gpt-4-0125-preview",             # January preview
+        "gpt-4-1106-preview",             # November preview
+        "gpt-4",                          # Standard GPT-4
+        "gpt-4-0613",                     # June snapshot
+        "gpt-4-0314",                     # March snapshot
+    }
+    
+    # GPT-3.5 Turbo models
+    GPT35_MODELS = {
+        "gpt-3.5-turbo",                  # Latest version
+        "gpt-3.5-turbo-0125",             # January snapshot
+        "gpt-3.5-turbo-1106",             # November snapshot
+        "gpt-3.5-turbo-instruct",         # Instruct version
+    }
+    
+    # Combined sets for API usage
+    CHAT_MODELS = GPT4O_MODELS | GPT4O_MINI_MODELS | GPT4_MODELS | GPT35_MODELS - {"gpt-3.5-turbo-instruct"}
+    INSTRUCT_MODELS = {"gpt-3.5-turbo-instruct"}
     
     def __init__(self, model_name: str = "gpt-4", **kwargs):
         super().__init__(model_name, **kwargs)
