@@ -14,13 +14,13 @@ import random
 import os
 import json
 
-__strategies__ = ["DISTRACTED_QUESTION", "SUPPRESS_REFUSAL", "AFFIRMATIVE_OUTPUT", "ROLE_PLAY_STORY", "ENCODED_INPUT"]
+from src.evol import __strategies__
 
 
 class QuestionStrategy:
 	def __init__(self):
 		self.name = "QuestionStrategy"
-		self.template_path = "data/prompt_variants"
+		self.template_path = "data/prompt_variants/questions"
 		self.templates = {}
 	
 	def sample_strategy(self):

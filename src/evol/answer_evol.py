@@ -11,14 +11,12 @@ import json
 import asyncio
 
 from src.evol.evol_llms import llm_generate
-
+from src.evol import __strategies__
 # --------------------Answer Format Templates--------------------
 # TODO: currently we only attach constraints to the question. We can consider using more advanced model to automatically extract constraints from the question.
 # 1. Analysis Request
 # 2. Harmful Check with reasoning
 # 3. Refusal or Output
-
-__strategies__ = ["DISTRACTED_QUESTION", "SUPPRESS_REFUSAL", "AFFIRMATIVE_OUTPUT", "ROLE_PLAY_STORY", "ENCODED_INPUT"]
 
 REPHRASE_FORMAT = """First, let me analyze the request: You are asking me answer ###question### ###constraints###"""
 

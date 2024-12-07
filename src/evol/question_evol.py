@@ -15,10 +15,9 @@ import json
 import asyncio
 
 from src.evol.evol_llms import llm_generate
+from src.evol import __strategies__
 
 # --------------------Strategies--------------------
-
-__strategies__ = ["DISTRACTED_QUESTION", "SUPPRESS_REFUSAL", "AFFIRMATIVE_OUTPUT", "ROLE_PLAY_STORY", "ENCODED_INPUT"]
 
 # template for strategies
 INPUT_FORMAT = "###question###"
