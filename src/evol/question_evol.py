@@ -172,7 +172,8 @@ class QuestionEvol:
 		
 		return prompt_variants
 	
-	def save_prompt_variants(self, strategy_name, prompt_variants, save_path="data/prompt_variants"):
+	def save_prompt_variants(self, strategy_name, prompt_variants, save_path="data/prompt_variants/questions"):
+		os.makedirs(save_path, exist_ok=True)
 		save_file = os.path.join(save_path, f"{strategy_name}.json")
 		if os.path.exists(save_file):
 			with open(save_file, "r") as f:
