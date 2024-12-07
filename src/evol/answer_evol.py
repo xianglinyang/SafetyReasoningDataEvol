@@ -99,9 +99,8 @@ class AnswerEvol:
             rephrase_prompt = self.createRephrasePrompt(seed_prompt)
             new_prompt = await llm_generate(model_name=model_name, 
                                             prompt=rephrase_prompt)
-            if self.clean_prompt(new_prompt):
-                print(len(new_variants))
-                print(new_prompt)
+            new_prompt = self.clean_prompt(new_prompt)
+            if new_prompt is not None:
                 new_variants.append(new_prompt)
         return new_variants
     
