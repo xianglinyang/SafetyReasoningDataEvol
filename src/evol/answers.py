@@ -35,24 +35,30 @@ class AnswerStrategy:
 		template = random.choice(self.templates[strategy])
 		return template
 	
+	def answer_template_simplified(self):
+		file_path = os.path.join(self.template_path, "simplified.json")
+		assert os.path.exists(file_path), f"Template file for simplified answer does not exist. Initialize the template from answer_evol.py first."
+		with open(file_path, "r") as f:
+			templates = json.load(f)
+		template = random.choice(templates)
+		return template
+	
 	def enrich_answer_with_strategy(self, question, category, strategy):
 		"""Enrich answer using specified strategy"""
-		template = self.strategy2answer_template(strategy)
-		answer_instance = template.format(
-			question=question,
-			category=category
-		)
+		if category is None:
+			template = self.answer_template_simplified()
+			answer_instance = template.format(question=question)
+		else:
+			template = self.strategy2answer_template(strategy)
+			answer_instance = template.format(question=question, category=category)
 		return answer_instance
 	
 	def enrich_answer(self, question, category):
 		"""Enrich answer using randomly selected strategy"""
 		strategy = self.sample_strategy()
-		template = self.strategy2answer_template(strategy)
-		answer_instance = template.format(
-			question=question,
-			category=category
-		)
+		answer_instance = self.enrich_answer_with_strategy(question, category, strategy)
 		return answer_instance
+
 
 # test function
 if __name__ == "__main__":
