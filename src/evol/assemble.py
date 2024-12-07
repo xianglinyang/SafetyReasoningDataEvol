@@ -122,9 +122,9 @@ def process_circuitbreaker_dataset(train):
 
 #-------------------------Main-------------------------
 def main():
-    # download_circuitbreaker_dataset(train=True)
-    # download_circuitbreaker_dataset(train=False)
-    # process_circuitbreaker_dataset(train=True) 
+    download_circuitbreaker_dataset(train=True)
+    download_circuitbreaker_dataset(train=False)
+    process_circuitbreaker_dataset(train=True) 
     process_circuitbreaker_dataset(train=False) 
 
 
