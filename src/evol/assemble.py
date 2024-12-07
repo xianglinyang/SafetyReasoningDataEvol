@@ -29,13 +29,13 @@ class DataEvolver:
         print("Question instance: ", question_instance)
         return question_instance
     
-    def evol_answer(self, question: str, question_category: str) -> str:
+    def evol_answer(self, question: str, question_category=None) -> str:
         """Evolve an answer using the same strategy as the question"""
         answer_instance = self.answer_strategy.enrich_answer(question, question_category)
         print("Answer instance: ", answer_instance)
         return answer_instance
 
-    def evol_data(self, question: str, question_category: str) -> tuple:
+    def evol_data(self, question: str, question_category=None) -> tuple:
         """Evolve a single question-answer pair"""
         question_instance = self.evol_question(question)
         answer_instance = self.evol_answer(question, question_category)
@@ -105,7 +105,7 @@ def process_circuitbreaker_dataset(train):
     evolved_dataset = []
     for data in dataset:
         question = data['prompt']
-        question_category = data['category']
+        question_category = None if 'category' not in data else data['category']
         refusal_answer = data['llama3_output']
         output = data['output']
         evolved_question, evolved_answer = data_evolver.evol_data(question, question_category)
@@ -122,9 +122,10 @@ def process_circuitbreaker_dataset(train):
 
 #-------------------------Main-------------------------
 def main():
-    data_evolver = DataEvolver()
-    download_circuitbreaker_dataset(train=True)
-    process_circuitbreaker_dataset(train=True) 
+    # download_circuitbreaker_dataset(train=True)
+    # download_circuitbreaker_dataset(train=False)
+    # process_circuitbreaker_dataset(train=True) 
+    process_circuitbreaker_dataset(train=False) 
 
 
 if __name__ == "__main__":
