@@ -1,10 +1,11 @@
 '''Adapt from https://raw.githubusercontent.com/GraySwanAI/circuit-breakers/refs/heads/main/src/args.py'''
 import logging
+import os
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Sequence, Union, List
-import transformers
-import typing
+from typing import Optional, List
+from transformers import TrainingArguments
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -27,7 +28,9 @@ class ModelArguments:
     """
 
     model_name_or_path: Optional[str] = field(
-        default=None,
+        # default=None,
+        # TODO: change to None in the future
+        default="meta-llama/Llama-2-7b-chat-hf",
         metadata={
             "help": (
                 "The model checkpoint for weights initialization. Don't set if you want to train a model from scratch."
@@ -88,31 +91,6 @@ class ModelArguments:
         metadata={"help": "Abbreviated name of the model (e.g., llama2, llama3)"}
     )
 
-@dataclass
-class LorraArguments:
-    target_layers: str = field(metadata={"help": "Layers for Representation. Layers are seperate by `,` eg: `10,12,14,16,18,20` "})
-    transform_layers: str = field(metadata={"help": "Layers for Representation. Layers are seperate by `,` eg: `10,12,14,16,18,20` "})
-    lorra_alpha: float = field(default=5, metadata={"help": ""}) # LoRRA Hyperparameters
-    trainsets: typing.List[str] = field(default=None, metadata={"help": "A list of trainsets for finetuning the corresponding Concepts/Functions, separated by # for commandline inputs (eg: ['AlpacaSupervisedDataset'])"})
-    valsets: typing.List[str] = field(default=None, metadata={"help": "A list of valsets for finetuning the corresponding Concepts/Functions, separated by # for commandline inputs (eg: ['AlpacaSupervisedDataset'])"})
-    adv_string: str = field(default="", metadata={"help": "adversarial string for harmful prompt. (eg: Start with 'Sure here's')"})
-    full_layers: bool = field(
-        default=False, metadata={"help": "Whether to drop not used layer during training"}
-    )
-
-@dataclass
-class LoraArguments:
-    lora_r: int = 8
-    lora_alpha: int = 16
-    lora_dropout: float = 0.05
-    lora_target_modules: Union[List[str], str] = field(
-        default_factory=lambda: ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
-    )
-    lora_weight_path: str = ""
-    lora_bias: str = "none"
-    q_lora: bool = False
-
-
 
 fsdp_config = {
     "mpt7b_finetune": {
@@ -159,19 +137,71 @@ fsdp_config = {
 
 
 @dataclass
-class TrainingArguments(transformers.TrainingArguments):
-    train_dataset_names: str = field(
+class TrainingArguments(TrainingArguments):
+    """
+    Custom training arguments that extend HuggingFace's TrainingArguments
+    """
+    # Dataset arguments
+    train_dataset_name: str = field(
         default=None,
         metadata={
-            "help": (
-                "The dataset to use for training. "
-            )
+            "help": "The dataset to use for training."
+        },
+    )
+    eval_dataset_name: str = field(
+        default="bbh",
+        metadata={
+            "help": "The dataset to use for evaluation."
+        },
+    )
+
+    # Output and logging arguments
+    output_dir: str = field(
+        default="outputs/default",
+        metadata={
+            "help": "The output directory where model predictions and checkpoints will be written."
+        },
+    )
+    logging_dir: str = field(
+        default=None,  # Will default to output_dir/runs
+        metadata={
+            "help": "Directory for storing logs. If None, defaults to output_dir/runs"
+        },
+    )
+    logging_strategy: str = field(
+        default="steps",
+        metadata={
+            "help": "The logging strategy to adopt during training.",
+            "choices": ["no", "steps", "epoch"]
+        },
+    )
+    logging_steps: int = field(
+        default=100,
+        metadata={
+            "help": "Log every X updates steps. Should be used with logging_strategy='steps'"
+        },
+    )
+    logging_first_step: bool = field(
+        default=False,
+        metadata={
+            "help": "Log the first step metrics."
+        },
+    )
+    report_to: str = field(
+        default="tensorboard",
+        metadata={
+            "help": "The list of integrations to report the results and logs to.",
+            "choices": ["azure_ml", "comet_ml", "mlflow", "neptune", "tensorboard", "clearml", "wandb"]
         },
     )
 
     def __post_init__(self):
+        # Set logging_dir if not provided
+        if self.logging_dir is None:
+            self.logging_dir = os.path.join(self.output_dir, "runs")
+        
+        # Handle FSDP config
         if isinstance(self.fsdp_config, str):
             self.fsdp_config = fsdp_config[self.fsdp_config]
-        if self.train_dataset_names is not None:
-            self.train_dataset_names = self.train_dataset_names.split(" ")
+        
         super().__post_init__()
