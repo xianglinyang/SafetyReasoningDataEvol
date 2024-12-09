@@ -15,7 +15,7 @@ class DataArguments:
         metadata={"help": "Name of the dataset to use"}
     )
     max_seq_length: Optional[int] = field(
-        default=1024,
+        default=2048,
         metadata={
             "help": "The maximum total input sequence length after tokenization."
         }
