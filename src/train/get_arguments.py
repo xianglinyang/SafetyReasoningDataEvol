@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DataArguments:
     dataset_name: str = field(
-        default="circuitbreaker",
+        default=None,
         metadata={"help": "Name of the dataset to use"}
     )
     max_seq_length: Optional[int] = field(
@@ -28,9 +28,7 @@ class ModelArguments:
     """
 
     model_name_or_path: Optional[str] = field(
-        # default=None,
-        # TODO: change to None in the future
-        default="meta-llama/Llama-2-7b-chat-hf",
+        default=None,
         metadata={
             "help": (
                 "The model checkpoint for weights initialization. Don't set if you want to train a model from scratch."
@@ -87,7 +85,7 @@ class ModelArguments:
     lora_target_modules: List[str]=field(
         default_factory=list, metadata={"help": ("target modules for lora")})
     model_name_abbr: str = field(
-        default="llama2",
+        default=None,
         metadata={"help": "Abbreviated name of the model (e.g., llama2, llama3)"}
     )
 
@@ -141,20 +139,7 @@ class TrainingArguments(TrainingArguments):
     """
     Custom training arguments that extend HuggingFace's TrainingArguments
     """
-    # Dataset arguments
-    train_dataset_name: str = field(
-        default=None,
-        metadata={
-            "help": "The dataset to use for training."
-        },
-    )
-    eval_dataset_name: str = field(
-        default="bbh",
-        metadata={
-            "help": "The dataset to use for evaluation."
-        },
-    )
-
+    # Output and logging arguments
     # Output and logging arguments
     output_dir: str = field(
         default="outputs/default",
@@ -162,8 +147,8 @@ class TrainingArguments(TrainingArguments):
             "help": "The output directory where model predictions and checkpoints will be written."
         },
     )
-    logging_dir: str = field(
-        default=None,  # Will default to output_dir/runs
+    logging_dir: Optional[str] = field(
+        default=None,  # Will be set in __post_init__
         metadata={
             "help": "Directory for storing logs. If None, defaults to output_dir/runs"
         },
@@ -188,7 +173,7 @@ class TrainingArguments(TrainingArguments):
         },
     )
     report_to: str = field(
-        default="tensorboard",
+        default="wandb",
         metadata={
             "help": "The list of integrations to report the results and logs to.",
             "choices": ["azure_ml", "comet_ml", "mlflow", "neptune", "tensorboard", "clearml", "wandb"]
