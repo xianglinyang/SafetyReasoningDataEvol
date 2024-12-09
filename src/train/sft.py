@@ -18,7 +18,6 @@ from transformers import (
     DataCollatorWithPadding
 )
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
-# from torch.nn.parallel import DistributedDataParallel as DDP
 
 from src.train.get_arguments import ModelArguments, DataArguments, TrainingArguments
 from src.train.data_utils.safety_datasets import SafetyReasoningDataset
@@ -88,16 +87,6 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
     model = AutoModelForCausalLM.from_pretrained(model_args.model_name_or_path, torch_dtype=model_args.torch_dtype, device_map=model_args.device_map)
-
-    # # Move model to GPU and wrap in DDP if using multiple GPUs
-    # if torch.cuda.device_count() > 1:
-    #     model = model.cuda()
-    #     model = DDP(model, device_ids=[training_args.local_rank])
-    #     logger.info(f"Using {torch.cuda.device_count()} GPUs for training")
-    # elif torch.cuda.is_available():
-    #     model = model.cuda()
-    #     logger.info("Using single GPU for training")
-
 
     # Load training dataset
     train_dataset = SafetyReasoningDataset(
