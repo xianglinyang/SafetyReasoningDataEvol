@@ -66,7 +66,7 @@ class ModelArguments:
         },
     )
     device_map: Optional[str] = field(
-        default="auto",
+        default="cuda",
         metadata={
             "help": "Device map for the model."
         }
