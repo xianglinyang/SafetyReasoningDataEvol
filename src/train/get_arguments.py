@@ -65,6 +65,12 @@ class ModelArguments:
             )
         },
     )
+    device_map: Optional[str] = field(
+        default="auto",
+        metadata={
+            "help": "Device map for the model."
+        }
+    )
     torch_dtype: Optional[str] = field(
         default=None,
         metadata={
@@ -177,6 +183,12 @@ class TrainingArguments(TrainingArguments):
         metadata={
             "help": "The list of integrations to report the results and logs to.",
             "choices": ["azure_ml", "comet_ml", "mlflow", "neptune", "tensorboard", "clearml", "wandb"]
+        },
+    )
+    dataloader_drop_last: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether to drop the last incomplete batch in the dataloader."
         },
     )
 
