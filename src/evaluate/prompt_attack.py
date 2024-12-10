@@ -272,6 +272,63 @@ def combination_attack(prompt, attack_fns):
         combined_prompt = attack(combined_prompt)
     return combined_prompt
 
+def get_attack_fn(attack_name):
+    if attack_name == "prefix_injection":
+        return prefix_injection_attack
+    elif attack_name == "prefix_injection_hello":
+        return prefix_injection_hello_attack
+    elif attack_name == "refusal_suppression":
+        return refusal_suppression_attack
+    elif attack_name == "refusal_suppression_inv":
+        return refusal_suppression_inv_attack
+    elif attack_name == "base64":
+        return base64_attack
+    elif attack_name == "base64_input_only":
+        return base64_input_only_attack
+    elif attack_name == "base64_output_only":
+        return base64_output_only_attack
+    elif attack_name == "base64_raw":
+        return base64_raw_attack
+    elif attack_name == "style_injection_short":
+        return style_injection_short_attack
+    elif attack_name == "style_injection_json":
+        return style_injection_json_attack
+    elif attack_name == "few_shot_json":
+        return few_shot_json_attack
+    elif attack_name == "distractors":
+        return distractors_attack
+    elif attack_name == "distractors_negated":
+        return distractors_negated_attack
+    elif attack_name == "wikipedia":
+        return wikipedia_attack
+    elif attack_name == "wikipedia_with_title":
+        return wikipedia_with_title_attack
+    elif attack_name == "disemvowel":
+        return disemvowel_attack
+    elif attack_name == "leetspeak":
+        return leetspeak_attack
+    elif attack_name == "rot13":
+        return rot13_attack
+    elif attack_name == "poems":
+        return poems_attack
+    elif attack_name == "auto_payload_splitting":
+        return auto_payload_splitting
+    elif attack_name == "auto_obfuscation":
+        return auto_obfuscation
+    elif attack_name == "aim":
+        return aim_attack
+    elif attack_name == "dev_mode_v2":
+        return dev_mode_v2_attack
+    elif attack_name == "dev_mode_with_rant":
+        return dev_mode_with_rant_attack
+    elif attack_name == "evil_confidant":
+        return evil_confidant_attack
+    elif attack_name == "evil_system_prompt":
+        return evil_system_prompt_attack
+    elif attack_name == "combination":
+        return combination_attack
+    else:
+        raise ValueError(f"Attack {attack_name} not found")
 
 
 # test functions
@@ -287,3 +344,8 @@ if __name__ == "__main__":
     print('*'*30)
     print(base64_attack(prompt))
     print('*'*30)
+
+    attack_name = "prefix_injection"
+    attack_fn = get_attack_fn(attack_name)
+    print(attack_name)
+    print(attack_fn(prompt))
