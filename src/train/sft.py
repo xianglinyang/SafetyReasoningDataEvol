@@ -20,7 +20,7 @@ from transformers import (
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
 from src.train.get_arguments import ModelArguments, DataArguments, TrainingArguments
-from src.train.data_utils.safety_datasets import SafetyReasoningDataset
+from src.data_utils.safety_datasets import SafetyReasoningDataset
 
 logger = logging.getLogger(__name__)
 
