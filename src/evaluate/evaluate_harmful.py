@@ -11,7 +11,6 @@ Metrics:
 from typing import List, Dict
 import json
 import os
-import gc
 import random
 import numpy as np
 from tqdm import tqdm
@@ -19,45 +18,13 @@ from transformers import AutoTokenizer
 import torch
 import time
 import litellm
+import argparse
 
 from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
-
+from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
 
 """
-The jailbreak prompt attack methods listed in the table are as follows:
-
-1. **AIM**
-2. **dev_mode_with_rant**
-3. **evil_system_prompt**
-4. **dev_mode_v2**
-5. **style_injection_short**
-6. **evil_confidant**
-7. **wikipedia_with_title**
-8. **style_injection_json**
-9. **refusal_suppression**
-10. **prefix_injection**
-11. **distractors**
-12. **auto_obfuscation**
-13. **distractors_negated**
-14. **poems**
-15. **auto_payload_splitting**
-16. **disemvowel**
-17. **rot13**
-18. **leetspeak**
-19. **few_shot_json**
-20. **combination_3**
-21. **combination_2**
-22. **base64**
-23. **prefix_injection_hello**
-24. **wikipedia**
-25. **combination_1**
-26. **base64_raw**
-27. **base64_output_only**
-28. **base64_input_only**
-29. **refusal_suppression_inv**
-30. **Adaptive attack**
-
 adversarial_attacks = 
 1. None
 2. Manual
@@ -70,13 +37,15 @@ adversarial_attacks =
 9. Input embedding
 10. RepE attack
 ]
-
 """
-
+##############################################################################################
+# ------------------------------------evaluation functions------------------------------------
+##############################################################################################
 __methods__ = [
     "substring_matching",
     "llamaguard2",
 ]
+
 
 # based on https://github.com/JailbreakBench/jailbreakbench/blob/4dbcc097739dd684fbf789cc3d4f97372bd72851/src/jailbreakbench/classifier.py
 # augmented with some additional prefixes
@@ -215,11 +184,17 @@ def llamaguard2_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
 
     return classifications
 
+##############################################################################################
+# ------------------------------------utils------------------------------------
+##############################################################################################
 
-def get_completions(llm, dataset, eval_num=-1):
+def get_completions(llm, dataset, attack_name, eval_num=-1):
+    attack_questions = []
     questions = []
     categories = []
     responses = []
+    attack_fn = get_attack_fn(attack_name)
+
     t0 = time.time()
 
     if eval_num == -1:
@@ -229,13 +204,17 @@ def get_completions(llm, dataset, eval_num=-1):
 
     for idx in tqdm(eval_idxs):
         question, category = dataset[idx]
-        llm_answer = llm.invoke(question)
+        attack_question = attack_fn(question)
+        llm_answer = llm.invoke(attack_question)
+        attack_questions.append(attack_question)
         questions.append(question)
         categories.append(category)
         responses.append(llm_answer)
 
         print(f"{idx} Question:")
         print(question, "\n")
+        print(f"Attack Question:")
+        print(attack_question, "\n")
         print("Response\n")
         print(llm_answer, "\n")
         print("*****************************\n")
@@ -245,7 +224,7 @@ def get_completions(llm, dataset, eval_num=-1):
     print(f'Generation num:{eval_num}')
     print(f"Time spent: {(t1-t0)/60:.2f} minutes")
 
-    return questions, categories, responses
+    return attack_questions, questions, categories, responses
 
 
 def evaluate_jailbreak(
@@ -295,42 +274,37 @@ def save_evaluation(evaluation: Dict, path: str):
 
 
 def main():
-    # parse args from command line
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--model_name_or_path", type=str, default="out")
-    # parser.add_argument("--dataset_name", type=str, default="gsm8k")
-    # parser.add_argument("--split", type=str, default="test")
-    # parser.add_argument("--eval_num", type=int, default=10)
-    # parser.add_argument("--device", type=str, default="cuda")
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model_name_or_path", type=str, default="meta-llama/Llama-2-7b-chat-hf")
+    parser.add_argument("--model_abbr", type=str, default="llama2")
+    parser.add_argument("--torch_type", type=torch.dtype, default=torch.bfloat16)
+    parser.add_argument("--dataset_name", type=str, default="sorrybench")
+    parser.add_argument("--split", type=str, default="train")
+    parser.add_argument("--eval_num", type=int, default=-1)
+    parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--attack_name", type=str)
+    args = parser.parse_args()
+    
+    model_name_or_path = args.model_name_or_path
+    dataset_name = args.dataset_name
+    split = args.split
+    eval_num = args.eval_num
+    device = args.device
+    attack_name = args.attack_name
+    model_abbr = args.model_abbr
+    torch_type = args.torch_type
 
-    # model_name_or_path = args.model_path
-
-    model_name_or_path = "out"
-    model_abbr = "llama2"
-    torch_type = torch.bfloat16
-    dataset_name = "sorrybench"
-    split = "train"
-    eval_num = 50
-    device = "cuda"
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, model_abbr=model_abbr, torch_dtype=torch_type, device=device)
     dataset = HarmfulDataset(dataset_name=dataset_name, split=split)
-    questions, categories, responses = get_completions(llm, dataset, eval_num)
-    evaluation = evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching"])
-    save_evaluation(evaluation, f"eval_results/ckpt_{dataset_name}_{split}.json")
+    attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num)
+    evaluation = evaluate_jailbreak(attack_questions, responses, categories, methodologies=["substring_matching"])
 
-    model_name_or_path = "meta-llama/Llama-2-7b-chat-hf"
-    model_abbr = "llama2"
-    torch_type = torch.bfloat16
-    dataset_name = "sorrybench"
-    split = "train"
-    eval_num = 50
-    device = "cuda"
-    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, model_abbr=model_abbr, torch_dtype=torch_type, device=device)
-    dataset = HarmfulDataset(dataset_name=dataset_name, split=split)
-    questions, categories, responses = get_completions(llm, dataset, eval_num)
-    evaluation = evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching"])
-    save_evaluation(evaluation, f"eval_results/llama2_{dataset_name}_{split}.json")
+    formatted_evaluation = dict()
+    key = f"{model_name_or_path}_{dataset_name}_{attack_name}"
+    formatted_evaluation[key] = evaluation
+
+    save_name = "prompt" if attack_name in __prompt_attacks_methods__ else "adv"
+    save_evaluation(formatted_evaluation, f"eval_results/{save_name}.json")
 
 if __name__ == "__main__":
     main()

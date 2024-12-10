@@ -35,6 +35,38 @@
 import base64
 from codecs import encode as rot13_encode
 
+__prompt_attacks_methods__ = [
+    # the list of the following methods:
+    "none",
+    "prefix_injection",
+    "prefix_injection_hello",
+    "refusal_suppression",
+    "refusal_suppression_inv",
+    "base64",
+    "base64_input_only",
+    "base64_output_only",
+    "base64_raw",
+    "style_injection_short",
+    "style_injection_json",
+    "few_shot_json",
+    "distractors",
+    "distractors_negated", 
+    "wikipedia",
+    "wikipedia_with_title",
+    "disemvowel",
+    "leetspeak",
+    "rot13",
+    "poems",
+    "auto_payload_splitting",
+    "auto_obfuscation",
+    "aim",
+    "dev_mode_v2",
+    "dev_mode_with_rant",
+    "evil_confidant",
+    "evil_system_prompt",
+    "combination"
+]
+
 
 def none_attack(prompt):
     """Baseline attack where the prompt is presented as-is."""
@@ -273,7 +305,9 @@ def combination_attack(prompt, attack_fns):
     return combined_prompt
 
 def get_attack_fn(attack_name):
-    if attack_name == "prefix_injection":
+    if attack_name == "none":
+        return none_attack
+    elif attack_name == "prefix_injection":
         return prefix_injection_attack
     elif attack_name == "prefix_injection_hello":
         return prefix_injection_hello_attack
