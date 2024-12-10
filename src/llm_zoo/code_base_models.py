@@ -20,7 +20,7 @@ Qwen/Qwen2.5-7B-Instruct
 import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import PeftModel, LoraConfig, get_peft_model
+from peft import PeftModel, LoraConfig
 
 from src.llm_zoo.base_model import BaseLLM
 from src.llm_zoo.model_configs import MODEL_CONFIGS
@@ -41,30 +41,6 @@ class HuggingFaceLLM(BaseLLM):
         self.assistant_tag = MODEL_CONFIGS[model_abbr]["assistant_tag"]
         self.system_tag = MODEL_CONFIGS[model_abbr]["system"]
     
-
-# model = load_model(args.model_path, dtype)
-
-# # resize embeddings if needed (e.g. for LlamaTokenizer)
-# embedding_size = model.get_input_embeddings().weight.shape[0]
-# if len(tokenizer) > embedding_size:
-#     model.resize_token_embeddings(len(tokenizer))
-
-# if args.initialize_lora:
-#     assert not isinstance(model, PeftModel)
-#     lora_config = LoraConfig(
-#         task_type=TaskType.CAUSAL_LM,
-#         inference_mode=False,
-#         r=args.lora_r,
-#         lora_alpha=args.lora_alpha,
-#         lora_dropout=args.lora_dropout,
-#         target_modules=args.lora_target_modules,
-#     )
-#     model = get_peft_model(model, lora_config)
-
-# if isinstance(model, PeftModel):
-#     model.print_trainable_parameters()
-
-    
     def _load_tokenizer(self, model_name_or_path):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         if self.tokenizer.pad_token is None:
@@ -79,9 +55,6 @@ class HuggingFaceLLM(BaseLLM):
                 config.base_model_name_or_path, torch_dtype=torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
             self.model = PeftModel.from_pretrained(
                 base_model, model_name_or_path, device_map=self.device, ignore_mismatched_sizes=True)
-            for name, param in self.model.named_parameters():
-                if 'lora' in name or 'Lora' in name:
-                    param.requires_grad = True
         else:
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name_or_path, torch_dtype=torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
@@ -127,9 +100,12 @@ class HuggingFaceLLM(BaseLLM):
         return decoded_output
 
 
-# test function
-if __name__ == "__main__":
+def main():
     model_path = "out/checkpoint-312"
     model = HuggingFaceLLM(model_name_or_path=model_path, model_abbr="llama2", device="cuda")
     prompt = "What is the capital of France?"
     print(model.invoke(prompt, verbose=False))
+
+# test function
+if __name__ == "__main__":
+    main()
