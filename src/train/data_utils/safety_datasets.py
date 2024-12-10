@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 import transformers
 
-from src.train.data_utils.model_configs import MODEL_CONFIGS
+from src.llm_zoo.model_configs import MODEL_CONFIGS
 
 '''template for one-shot and multi round messages'''
 
