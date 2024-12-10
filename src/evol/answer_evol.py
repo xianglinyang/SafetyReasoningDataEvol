@@ -10,7 +10,7 @@ import os
 import json
 import asyncio
 
-from src.evol.evol_llms import llm_generate
+from src.llm_zoo.api_base_models import OpenAILLM
 from src.evol import __strategies__
 # --------------------Answer Format Templates--------------------
 # TODO: currently we only attach constraints to the question. We can consider using more advanced model to automatically extract constraints from the question.
@@ -110,8 +110,8 @@ class AnswerEvol:
         while len(new_variants) < num_variants:
             seed_prompt = random.choice(new_variants)
             rephrase_prompt = self.createRephrasePrompt(seed_prompt)
-            new_prompt = await llm_generate(model_name=model_name, 
-                                            prompt=rephrase_prompt)
+            llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
+            new_prompt = await llm.invoke(rephrase_prompt)
             if self.clean_prompt(new_prompt):
                 new_variants.append(new_prompt)
         new_variants = [self.clean_prompt(prompt) for prompt in new_variants]
@@ -127,7 +127,8 @@ class AnswerEvol:
         while len(new_variants) < num_variants:
             seed_prompt = random.choice(new_variants)
             rephrase_prompt = self.createRephrasePrompt(seed_prompt)
-            new_prompt = await llm_generate(model_name=model_name, prompt=rephrase_prompt)
+            llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
+            new_prompt = await llm.invoke(rephrase_prompt)
             if self.clean_prompt(new_prompt, category=False):
                 new_variants.append(new_prompt)
                 print(len(new_variants))
@@ -156,12 +157,12 @@ if __name__ == "__main__":
 
         answer_evol = AnswerEvol()
 
-        # for strategy in ["DISTRACTED_QUESTION", "SUPPRESS_REFUSAL", "AFFIRMATIVE_OUTPUT", "ROLE_PLAY_STORY"]:
-        #     print(f"Generating {num_variants_per_class} variants for {strategy}...")
-        #     answer_variants = await answer_evol.generate_reasoning_variants_with_strategy(strategy, model_name, num_variants_per_class)
-        #     answer_evol.save_answer_variants(strategy, answer_variants)
-        #     print(f"Saved {len(answer_variants)} variants for {strategy}.")
-        #     print("*"*50)
+        for strategy in ["DISTRACTED_QUESTION", "SUPPRESS_REFUSAL", "AFFIRMATIVE_OUTPUT", "ROLE_PLAY_STORY"]:
+            print(f"Generating {num_variants_per_class} variants for {strategy}...")
+            answer_variants = await answer_evol.generate_reasoning_variants_with_strategy(strategy, model_name, num_variants_per_class)
+            answer_evol.save_answer_variants(strategy, answer_variants)
+            print(f"Saved {len(answer_variants)} variants for {strategy}.")
+            print("*"*50)
 
         answer_variants = await answer_evol.generate_simplified_answer_variants(model_name, num_variants_per_class)
         answer_evol.save_answer_variants("simplified", answer_variants)

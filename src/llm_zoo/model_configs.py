@@ -38,7 +38,6 @@ MODEL_CONFIGS = {
         "user_tag": LLAMA2_USER_TAG,
         "assistant_tag": LLAMA2_ASSISTANT_TAG,
         "system": LLAMA2_SYSTEM,
-        "system_prompt": LLAMA2_DEFAULT_SYSTEM_PROMPT,
         "sep_token": LLAMA2_SEP_TOKEN,
     },
     "llama3": {

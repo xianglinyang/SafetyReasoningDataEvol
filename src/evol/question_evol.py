@@ -14,7 +14,7 @@ import os
 import json
 import asyncio
 
-from src.evol.evol_llms import llm_generate
+from src.llm_zoo.api_base_models import OpenAILLM
 from src.evol import __strategies__
 
 # --------------------Strategies--------------------
@@ -147,7 +147,9 @@ class QuestionEvol:
 		while len(seed_prompts) < num_seed:
 			prompt_rephraser = self.createRephrasePrompt(prompt_template)
 			# Remove asyncio.run() since we're already in an async function
-			seed_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rephraser)
+			llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
+			seed_prompt = await llm.invoke(prompt_rephraser)
+			# seed_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rephraser)
 			if INPUT_FORMAT in seed_prompt:
 				seed_prompts.append(seed_prompt)
 		print(f"Generated {len(seed_prompts)} seed prompts")
@@ -160,7 +162,9 @@ class QuestionEvol:
 			# 2.2 enrich the seed prompt with the strategy
 			prompt_rewriter = strategy_fn(seed_prompt)
 			# 2.3 get the new prompt
-			new_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rewriter)
+			llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
+			new_prompt = await llm.invoke(prompt_rewriter)
+			# new_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rewriter)
 			print(new_prompt)
 			print("-"*20)
 			# 2.4 clean the new prompt
@@ -186,11 +190,11 @@ if __name__ == "__main__":
 	model_name = "gpt-4-turbo"
 	async def main(strategy_name):
 		question_evol = QuestionEvol()
-		prompt_variants = await question_evol.generate_prompt_variants_with_strategy(strategy_name, model_name=model_name, num_seed=10, num_variants=450)
+		prompt_variants = await question_evol.generate_prompt_variants_with_strategy(strategy_name, model_name=model_name, num_seed=10, num_variants=500)
 		question_evol.save_prompt_variants(strategy_name.lower(), prompt_variants)	
-	# asyncio.run(main("SUPPRESS_REFUSAL"))
-	# asyncio.run(main("DISTRACTED_QUESTION"))
-	# asyncio.run(main("ROLE_PLAY_STORY"))
+	asyncio.run(main("SUPPRESS_REFUSAL"))
+	asyncio.run(main("DISTRACTED_QUESTION"))
+	asyncio.run(main("ROLE_PLAY_STORY"))
 	asyncio.run(main("AFFIRMATIVE_OUTPUT"))
 	
 
