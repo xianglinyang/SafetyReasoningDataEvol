@@ -19,11 +19,13 @@ import torch
 import time
 import litellm
 import argparse
+import logging
 
 from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
 
+logger = logging.getLogger(__name__)
 """
 adversarial_attacks = 
 1. None
@@ -189,6 +191,7 @@ def llamaguard2_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
 ##############################################################################################
 
 def get_completions(llm, dataset, attack_name, eval_num=-1):
+    logger.info(f"Getting completions for {attack_name} attack")
     attack_questions = []
     questions = []
     categories = []
@@ -211,18 +214,18 @@ def get_completions(llm, dataset, attack_name, eval_num=-1):
         categories.append(category)
         responses.append(llm_answer)
 
-        print(f"{idx} Question:")
-        print(question, "\n")
-        print(f"Attack Question:")
-        print(attack_question, "\n")
-        print("Response\n")
-        print(llm_answer, "\n")
+        logger.info(f"{idx} Question:")
+        logger.info(question)
+        logger.info(f"Attack Question:")
+        logger.info(attack_question)
+        logger.info("Response\n")
+        logger.info(llm_answer)
         print("*****************************\n")
 
     t1 = time.time()
     print('*****************************')
-    print(f'Generation num:{eval_num}')
-    print(f"Time spent: {(t1-t0)/60:.2f} minutes")
+    logger.info(f'Generation num:{eval_num if eval_num != -1 else len(dataset)}')
+    logger.info(f"Time spent: {(t1-t0)/60:.2f} minutes")
 
     return attack_questions, questions, categories, responses
 
@@ -243,7 +246,7 @@ def evaluate_jailbreak(
             refusals[i] = int(not substring_matching_judge_fn(responses[i]))
         
         evaluation["substring_matching_success_rate"] = np.mean(refusals)
-        print(f"Average Substring Matching ASR: {evaluation['substring_matching_success_rate']}")
+        logger.info(f"Average Substring Matching ASR: {evaluation['substring_matching_success_rate']}")
 
 
     if "llamaguard2" in methodologies:
@@ -254,23 +257,26 @@ def evaluate_jailbreak(
             safety_score[i] = classifications[i]
 
         evaluation["llamaguard2_success_rate"] = np.mean(classifications)
-        print(f"Average LlamaGuard2 ASR: {evaluation['llamaguard2_success_rate']}")
+        logger.info(f"Average LlamaGuard2 ASR: {evaluation['llamaguard2_success_rate']}")
 
 
     return evaluation
 
 
-def save_evaluation(evaluation: Dict, path: str):
+def save_evaluation(results: Dict, path="eval_results"):
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
     if os.path.exists(path):
        with open(path, "r") as f:
            existing_evaluation = json.load(f)
-           existing_evaluation.update(evaluation)
-           evaluation = existing_evaluation
-    with open(path, "w") as f:
-        json.dump(evaluation, f)
-        print(f"Evaluation results saved at {path}")
+    else:
+        existing_evaluation = list()
+
+    existing_evaluation.append(results)
+    save_file = os.path.join(path, "evaluate_harmful.json")
+    with open(save_file, "w") as f:
+        json.dump(existing_evaluation, f)
+        print(f"Evaluation results saved at {save_file}")
 
 
 def main():
@@ -284,6 +290,8 @@ def main():
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--attack_name", type=str)
     args = parser.parse_args()
+
+    logger.info(f"Evaluating Arguments: {args}")
     
     model_name_or_path = args.model_name_or_path
     dataset_name = args.dataset_name
@@ -299,14 +307,23 @@ def main():
     attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num)
     evaluation = evaluate_jailbreak(attack_questions, responses, categories, methodologies=["substring_matching"])
 
-    formatted_evaluation = dict()
-    key = f"{model_name_or_path}_{dataset_name}_{attack_name}"
-    formatted_evaluation[key] = evaluation
+    results = {
+        "model_name_or_path": model_name_or_path,
+        "dataset_name": dataset_name,
+        "attack_name": attack_name,
+        "eval_num": eval_num,
+        "split": split,
+        "torch_type": torch_type,
+        "attack_type": "prompt" if attack_name in __prompt_attacks_methods__ else "adv",
+        "evaluation": evaluation
+    }
+    logger.info(f"Evaluation results: {results}")
 
-    save_name = "prompt" if attack_name in __prompt_attacks_methods__ else "adv"
-    save_evaluation(formatted_evaluation, f"eval_results/{save_name}.json")
+    save_evaluation(results)
 
 if __name__ == "__main__":
+    from src.logger.config import setup_logging
+    setup_logging(task_name="evaluate_harmful")
     main()
 
 
