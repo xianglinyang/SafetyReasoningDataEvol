@@ -21,7 +21,7 @@ attack_name_list=(
 )
 
 
-header="torchrun --nproc_per_node=1 -m src.evaluate.evaluate_harmful"
+header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --split train \
 --device cuda \

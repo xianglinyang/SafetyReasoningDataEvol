@@ -14,7 +14,7 @@ dataset_name_list=(
     "gsm8k"
 )
 
-header="torchrun --nproc_per_node=1 -m src.evaluate.evaluate_common_reasoning"
+header="python -m src.evaluate.evaluate_common_reasoning"
 base_arguments="\
 --torch_type bf16 \
 --split test \

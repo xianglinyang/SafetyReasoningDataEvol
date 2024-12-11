@@ -105,7 +105,7 @@ def main():
     logger.info(f"Arguments: {args}")
 
     # read args
-    model_name_or_path = args.model_path
+    model_name_or_path = args.model_name_or_path
     torch_type = args.torch_type
     dataset_name = args.dataset_name
     split = args.split
