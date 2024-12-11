@@ -24,22 +24,9 @@ import logging
 from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
+from src.evaluate.adv_attack import __adv_attacks__
 
 logger = logging.getLogger(__name__)
-"""
-adversarial_attacks = 
-1. None
-2. Manual
-3. AutoDAN
-4. TAP-T
-5. PAIR
-6. GCG
-7. Multilingual
-8. Prefilling
-9. Input embedding
-10. RepE attack
-]
-"""
 ##############################################################################################
 # ------------------------------------evaluation functions------------------------------------
 ##############################################################################################
