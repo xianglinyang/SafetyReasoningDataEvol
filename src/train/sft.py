@@ -6,9 +6,7 @@ import os
 import sys
 import time
 import logging
-from typing import Optional
 
-import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -21,51 +19,22 @@ from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
 from src.train.get_arguments import ModelArguments, DataArguments, TrainingArguments
 from src.data_utils.safety_datasets import SafetyReasoningDataset
+from src.logger.config import setup_logging
 
 logger = logging.getLogger(__name__)
 
-# redirect logging from console to file
-def setup_logging(training_args):
-    """Setup logging to both file and console"""
-    
-    # Create logs directory if it doesn't exist
-    log_dir = os.path.join(training_args.output_dir, "logs")
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # Create log file path with timestamp
-    time_stamp = time.strftime("%Y%m%d-%H%M%S")
-    log_file = os.path.join(log_dir, f"training_{time_stamp}.log")
-    
-    # Setup logging format
-    log_format = "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
-    date_format = "%m/%d/%Y %H:%M:%S"
-    
-    # Setup logging to both file and console
-    logging.basicConfig(
-        format=log_format,
-        datefmt=date_format,
-        level=logging.INFO,
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    logger.setLevel(logging.INFO)
-
-def compute_loss(model, inputs, return_outputs=False):
-    # Print input shapes for debugging
-    print("Input shapes:", {k: v.shape for k, v in inputs.items()})
-    outputs = model(**inputs)
-    loss = outputs.loss
-    return (loss, outputs) if return_outputs else loss
-
 def main():
+    # Setup logging
+    setup_logging(task_name="train")
+
     # Parse arguments
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    
-    # Setup logging
-    setup_logging(training_args)
+
+    # log arguments
+    logger.info(f"Training parameters {training_args}")
+    logger.info(f"Model parameters {model_args}")
+    logger.info(f"Dataset parameters {data_args}")
     
     # Set seed for reproducibility
     set_seed(training_args.seed)
@@ -76,9 +45,6 @@ def main():
         use_fast=model_args.use_fast_tokenizer,
         padding_side="right"
     )
-    logger.info(f"Training parameters {training_args}")
-    logger.info(f"Model parameters {model_args}")
-    logger.info(f"Dataset parameters {data_args}")
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
@@ -175,10 +141,9 @@ def main():
 if __name__ == "__main__":
     # TODO: remove wandb
     #---wandb---
-    import wandb
-    wandb.init(mode="offline", dir="out")  # Saves logs locally in outputs/wandb
+    import os
     # Or alternatively, you can set the environment variable
     os.environ["WANDB_MODE"] = "offline"
-    os.environ["WANDB_DIR"] = "out"
+    os.environ["WANDB_DIR"] = "."
     #---wandb---
     main()
