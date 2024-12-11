@@ -2,8 +2,8 @@ import json
 from typing import Dict, List
 
 import torch
-from torch.utils.data import Dataset
 import transformers
+from torch.utils.data import Dataset
 
 '''Dataset for Safety Reasoning'''
 class SafetyReasoningDataset(Dataset):
@@ -36,17 +36,15 @@ class SafetyReasoningDataset(Dataset):
             messages.append({"role": "system", "content": self.system_inst})
         messages.append({"role": "user", "content": question})
         messages.append({"role": "assistant", "content": answer})
-        text = self.tokenizer.apply_chat_template(messages, tokenize=False)
 
         # Tokenize with explicit padding and truncation
-        encodings = self.tokenizer(
-            text,
-            max_length=self.max_length,
-            padding='max_length',
-            truncation=True,
-            return_tensors="pt",
-            return_attention_mask=True
-        )
+        encodings = self.tokenizer.apply_chat_template(messages,
+                                                  max_length=self.max_length,
+                                                  padding='max_length',
+                                                  truncation=True,
+                                                  return_tensors="pt",
+                                                  return_attention_mask=True,
+                                                  return_dict=True)
         
         # Create the model inputs
         model_inputs = {
@@ -55,23 +53,19 @@ class SafetyReasoningDataset(Dataset):
         }
         # Create labels (same as input_ids but with -100 for non-assistant tokens)
         labels = encodings['input_ids'][0].clone()
-        
-        # Find where the assistant response starts
-        assistant_tokens = self.tokenizer.encode(
-            self.assistant_tag, 
-            add_special_tokens=False
-        )
-        
-        # Find the position where assistant's response starts
-        response_start = self._find_subsequence(
-            labels.tolist(), 
-            assistant_tokens
-        )
-        
-        if response_start is not None:
-            # Mask everything before the assistant's response
-            labels[:response_start + len(assistant_tokens)] = -100
-            
+
+        # assistant_tokens_mask
+        encodings_wo_assistant = self.tokenizer.apply_chat_template(messages[:-1],
+                                                  max_length=self.max_length,
+                                                  padding='max_length',
+                                                  truncation=True,
+                                                  return_tensors="pt",
+                                                  return_attention_mask=True,
+                                                  return_dict=True)
+
+        # mask the prompt part for avoiding loss
+        labels[:encodings_wo_assistant.input_ids.shape[1]] = -100    
+    
         model_inputs['labels'] = labels
         return model_inputs
     
