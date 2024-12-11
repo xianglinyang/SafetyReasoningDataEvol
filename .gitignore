@@ -168,7 +168,7 @@ data/raw/
 
 log
 
-out
+outputs/
 
 eval_results/
 
