@@ -189,6 +189,9 @@ def get_completions(llm, dataset, attack_name, eval_num=-1):
 
     if eval_num == -1:
         eval_idxs = range(len(dataset))
+    elif eval_num > len(dataset):
+        eval_idxs = range(len(dataset))
+        eval_num = len(dataset)
     else:
         eval_idxs = random.sample(range(len(dataset)), eval_num)
 
@@ -268,9 +271,8 @@ def save_evaluation(results: Dict, path="eval_results"):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path", type=str, default="meta-llama/Llama-2-7b-chat-hf")
-    parser.add_argument("--model_abbr", type=str, default="llama2")
-    parser.add_argument("--torch_type", type=torch.dtype, default=torch.bfloat16)
+    parser.add_argument("--model_name_or_path", type=str)
+    parser.add_argument("--torch_type", type=str, choices=["bf16", "fp16", "fp32"])
     parser.add_argument("--dataset_name", type=str, default="sorrybench")
     parser.add_argument("--split", type=str, default="train")
     parser.add_argument("--eval_num", type=int, default=-1)
@@ -286,10 +288,18 @@ def main():
     eval_num = args.eval_num
     device = args.device
     attack_name = args.attack_name
-    model_abbr = args.model_abbr
-    torch_type = args.torch_type
 
-    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, model_abbr=model_abbr, torch_dtype=torch_type, device=device)
+    torch_type = args.torch_type
+    if torch_type == "bf16":
+        torch_type = torch.bfloat16
+    elif torch_type == "fp16":
+        torch_type = torch.float16
+    elif torch_type == "fp32":
+        torch_type = torch.float32
+    else:
+        raise ValueError(f"Invalid torch_type: {torch_type}")
+
+    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = HarmfulDataset(dataset_name=dataset_name, split=split)
     attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num)
     evaluation = evaluate_jailbreak(attack_questions, responses, categories, methodologies=["substring_matching"])
