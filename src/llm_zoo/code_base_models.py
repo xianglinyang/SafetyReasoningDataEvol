@@ -26,21 +26,14 @@ from src.llm_zoo.base_model import BaseLLM
 from src.llm_zoo.model_configs import MODEL_CONFIGS
 
 class HuggingFaceLLM(BaseLLM):
-    def __init__(self, model_name_or_path="meta-llama/Llama-2-7b-chat-hf", model_abbr="llama2", torch_dtype=torch.bfloat16, device="cuda"):
+    def __init__(self, model_name_or_path="meta-llama/Llama-2-7b-chat-hf", torch_dtype=torch.bfloat16, device="cuda"):
         super().__init__(model_name_or_path)
         self.model_name_or_path=model_name_or_path
-        self.model_abbr=model_abbr
         self.torch_dtype=torch_dtype
         self.device=device
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self._load_model(model_name_or_path, device, torch_dtype)
-        
-        # -- model configs --
-        self.separator = MODEL_CONFIGS[model_abbr]["sep_token"]
-        self.user_tag = MODEL_CONFIGS[model_abbr]["user_tag"]
-        self.assistant_tag = MODEL_CONFIGS[model_abbr]["assistant_tag"]
-        self.system_tag = MODEL_CONFIGS[model_abbr]["system"]
-    
+
     def _load_tokenizer(self, model_name_or_path):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         if self.tokenizer.pad_token is None:
@@ -63,26 +56,18 @@ class HuggingFaceLLM(BaseLLM):
         embedding_size = self.model.get_input_embeddings().weight.shape[0]
         if len(self.tokenizer) > embedding_size:
             self.model.resize_token_embeddings(len(self.tokenizer))
+    
+    def prompt2messages(self, prompt, system=None):
+        messages = list()
+        if system is not None:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        return messages
 
-    def format_prompt(self, prompt, system=True):
-        if system:
-            one_shot_template = "{system}{user_tag}{instruction}{assistant_tag}{separator}"
-            return one_shot_template.format(
-                system=system,
-                user_tag=self.user_tag, 
-                instruction=prompt, 
-                assistant_tag=self.assistant_tag,
-                separator=self.separator)
-        else:
-            one_shot_template = "{user_tag}{instruction}{assistant_tag}{separator}"
-            return one_shot_template.format(
-                user_tag=self.user_tag, assistant_tag=self.assistant_tag,
-                instruction=prompt, separator=self.separator)
-
-    def invoke(self, prompt, max_new_tokens=2048, temperature=0.1, system=True, verbose=False):
-        # Use model specific format
-        prompt = self.format_prompt(prompt, system=system)
-
+    def invoke(self, prompt, max_new_tokens=2048, temperature=0.1, system=None, verbose=False):
+        messages = self.prompt2messages(prompt, system)
+        prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
+        
         # 3: Tokenize the chat (This can be combined with the previous step using tokenize=True)
         inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
         # Move the tokenized inputs to the same device the model is on (GPU/CPU)
@@ -101,8 +86,8 @@ class HuggingFaceLLM(BaseLLM):
 
 
 def main():
-    model_path = "out/checkpoint-312"
-    model = HuggingFaceLLM(model_name_or_path=model_path, model_abbr="llama2", device="cuda")
+    model_path = "out"
+    model = HuggingFaceLLM(model_name_or_path=model_path, device="cuda")
     prompt = "What is the capital of France?"
     print(model.invoke(prompt, verbose=False))
 

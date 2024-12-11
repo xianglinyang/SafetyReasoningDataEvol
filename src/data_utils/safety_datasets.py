@@ -5,43 +5,6 @@ import torch
 from torch.utils.data import Dataset
 import transformers
 
-from src.llm_zoo.model_configs import MODEL_CONFIGS
-
-'''template for one-shot and multi round messages'''
-
-def concat_one_shot(instruction, response, system, user_tag, assistant_tag):
-    if system is not None:
-        one_shot_template = "{system}{user_tag}{instruction}{assistant_tag}<SEPARATOR>{response}"
-        return one_shot_template.format(
-            system=system,
-            user_tag=user_tag, 
-            instruction=instruction, 
-            assistant_tag=assistant_tag,
-            response=response)
-    else:
-        one_shot_template = "{user_tag}{instruction}{assistant_tag}<SEPARATOR>{response}"
-        return one_shot_template.format(
-            user_tag=user_tag, assistant_tag=assistant_tag,
-            instruction=instruction, response=response)
-
-# TODO need to verify this
-def concat_messages(messages, eos_token, user_tag, assistant_tag, system_tag):
-    """Concatenate messages with role delimiters and proper EOS tokens."""
-    message_text = ""
-    for message in messages:
-        role = message["role"]
-        content = message["content"].strip()
-        if role == "user":
-            message_text += user_tag + content + "\n"
-        elif role == "assistant":
-            message_text += assistant_tag + content + eos_token + "\n"
-        elif role == "system":
-            message_text += system_tag + content + "\n"
-        else:
-            raise ValueError(f"Invalid role: {role}")
-    return message_text
-
-
 '''Dataset for Safety Reasoning'''
 class SafetyReasoningDataset(Dataset):
     
@@ -49,23 +12,14 @@ class SafetyReasoningDataset(Dataset):
                 dataset_name: str,      # 'circuitbreaker'
                 split: str,             # train/val/test
                 tokenizer: transformers.PreTrainedTokenizer, 
-                model_name: str,     # 'llama2','llama3','mistral', 'qwen', 
-                max_length: int = 2048
+                max_length: int = 2048,
+                system_inst=None
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.tokenizer = tokenizer
-        self.model_name = model_name.lower()
         self.max_length = max_length
         self.dataset = self._load_data(dataset_name, split)
-
-        # ================ Model and Template Config  ================
-        assert self.model_name in MODEL_CONFIGS.keys(), f"Model {self.model_name} not supported"
-
-        configs = MODEL_CONFIGS[self.model_name]
-        self.user_tag = configs['user_tag']
-        self.assistant_tag = configs['assistant_tag']
-        self.system = configs['system']
-        self.sep_token = configs['sep_token']
+        self.system_inst = system_inst
 
     def __len__(self):
         return len(self.dataset)
@@ -76,15 +30,13 @@ class SafetyReasoningDataset(Dataset):
         question = example['evolved_question']
         answer = example['evolved_answer']
 
-        # Format using one-shot template
-        text = concat_one_shot(
-            instruction=question,
-            response=answer,
-            system=self.system,
-            user_tag=self.user_tag,
-            assistant_tag=self.assistant_tag
-        )
-        text = text.replace('<SEPARATOR>', self.sep_token)
+        # format data
+        messages = list()
+        if self.system_inst is not None:
+            messages.append({"role": "system", "content": self.system_inst})
+        messages.append({"role": "user", "content": question})
+        messages.append({"role": "assistant", "content": answer})
+        text = self.tokenizer.apply_chat_template(messages, tokenize=False)
 
         # Tokenize with explicit padding and truncation
         encodings = self.tokenizer(
