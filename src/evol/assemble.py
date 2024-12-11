@@ -124,9 +124,6 @@ def process_circuitbreaker_dataset(train):
 
 #-------------------------Main-------------------------
 def main():
-    from src.logger.config import setup_logging
-    setup_logging(task_name="test")
-    
     download_circuitbreaker_dataset(train=True)
     download_circuitbreaker_dataset(train=False)
     process_circuitbreaker_dataset(train=True) 
@@ -134,4 +131,8 @@ def main():
 
 
 if __name__ == "__main__":
+    from src.logger.config import setup_logging
+    setup_logging(task_name="data_evol")
+
+    logger.info("Assembling data...")
     main()

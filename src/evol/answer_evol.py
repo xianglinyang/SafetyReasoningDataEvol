@@ -151,9 +151,9 @@ class AnswerEvol:
 if __name__ == "__main__":
     import asyncio
     from src.logger.config import setup_logging
+    setup_logging(task_name="data_evol")
     
     async def main():
-        setup_logging(task_name="test")
         
         num_variants_per_class = 100
         model_name = "gpt-4o"
@@ -169,6 +169,7 @@ if __name__ == "__main__":
         answer_variants = await answer_evol.generate_simplified_answer_variants(model_name, num_variants_per_class)
         answer_evol.save_answer_variants("simplified", answer_variants)
         logger.info(f"Saved {len(answer_variants)} variants for simplified version.")
-
+    
+    logger.info("Generating answer variants...")
     asyncio.run(main())
     
