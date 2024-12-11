@@ -25,8 +25,8 @@ base_arguments="\
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
-model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8b-chat-hf" "mistralai/Mistral-7B-Instruct-v0.3")
-model_name_abbrs=("llama2" "llama3" "mistral")
+model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.1")
+model_name_abbrs=("llama2-7b" "llama3-8b" "mistral-7b")
 out_dir="outputs"
 
 # Loop through each dataset
@@ -42,8 +42,7 @@ for dataset_name in ${dataset_names[@]}; do
         full_command="$header $base_arguments \
         --dataset_name $dataset_name \
         --output_dir $output_dir \
-        --model_name_or_path ${model_name_or_paths[$i]} \
-        --model_name_abbr ${model_name_abbrs[$i]}"
+        --model_name_or_path ${model_name_or_paths[$i]}"
 
         echo "Training model: ${model_name_or_paths[$i]}"
         echo "$full_command"
