@@ -166,7 +166,7 @@ data/raw/
 
 *.ipynb
 
-log
+logs
 
 outputs/
 
