@@ -142,8 +142,5 @@ def test():
 
 if __name__ == "__main__":
     from src.logger.config import setup_logging
-    # setup_logging(task_name="evaluate_loss")
-    # main()
-
-    setup_logging(task_name="test")
-    test()
+    setup_logging(task_name="evaluate_loss")
+    main()
