@@ -59,14 +59,13 @@ def main():
         dataset_name=data_args.dataset_name,
         split="train",
         tokenizer=tokenizer,
-        model_name=model_args.model_name_abbr,
-        max_length=data_args.max_seq_length
+        max_length=data_args.max_seq_length,
+        # system_inst=data_args.system_inst
         )
     val_dataset = SafetyReasoningDataset(
         dataset_name=data_args.dataset_name,
         split="val",
         tokenizer=tokenizer,
-        model_name=model_args.model_name_abbr,
         max_length=data_args.max_seq_length
     )
 

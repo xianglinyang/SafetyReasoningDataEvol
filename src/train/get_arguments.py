@@ -90,10 +90,6 @@ class ModelArguments:
     lora_dropout: Optional[float]=field(default=0.1, metadata={"help": ("dropout for lora")})
     lora_target_modules: List[str]=field(
         default_factory=list, metadata={"help": ("target modules for lora")})
-    model_name_abbr: str = field(
-        default=None,
-        metadata={"help": "Abbreviated name of the model (e.g., llama2, llama3)"}
-    )
 
 
 fsdp_config = {
