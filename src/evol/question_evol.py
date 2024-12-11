@@ -13,9 +13,12 @@ import random
 import os
 import json
 import asyncio
+import logging
 
 from src.llm_zoo.api_base_models import OpenAILLM
 from src.evol import __strategies__
+
+logger = logging.getLogger(__name__)
 
 # --------------------Strategies--------------------
 
@@ -132,13 +135,15 @@ class QuestionEvol:
     # --------------------Utils--------------------
 	def clean_prompt(self, prompt):
 		# format the output and filter out the invalid prompt
+		logger.info("Cleaning prompt to remove ###question###: {}".format(prompt))
 		if "###question###" in prompt:
 			prompt = prompt.replace("###question###", "{question}")
 			return prompt
 		else:
+			logger.info("Prompt is invalid due to missing ###question###.")
 			return None
 	
-	async def generate_prompt_variants_with_strategy(self, strategy_name, model_name="gpt-3.5-turbo-instruct", num_seed=10, num_variants=200):
+	async def generate_prompt_variants_with_strategy(self, strategy_name, model_name, num_seed=10, num_variants=200):
 		prompt_template = self.strategies_template_mapping[strategy_name]
 		strategy_fn = self.depth_strategy_fn(strategy_name)
 		
@@ -152,7 +157,7 @@ class QuestionEvol:
 			# seed_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rephraser)
 			if INPUT_FORMAT in seed_prompt:
 				seed_prompts.append(seed_prompt)
-		print(f"Generated {len(seed_prompts)} seed prompts")
+		logger.info(f"Generated {len(seed_prompts)} seed prompts")
 
 		# 2. enrich the seed prompt with the strategy
 		prompt_variants = []
@@ -164,14 +169,12 @@ class QuestionEvol:
 			# 2.3 get the new prompt
 			llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
 			new_prompt = await llm.invoke(prompt_rewriter)
-			# new_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rewriter)
-			print(new_prompt)
-			print("-"*20)
+			logger.info(f"Generated new prompt: {new_prompt}")
 			# 2.4 clean the new prompt
 			new_prompt = self.clean_prompt(new_prompt)
 			if new_prompt is not None:
 				prompt_variants.append(new_prompt.strip())
-			print(f"Generated {len(prompt_variants)} prompt variants")
+			logger.info(f"Generated {len(prompt_variants)} prompt variants")
 		
 		return prompt_variants
 	
@@ -185,6 +188,7 @@ class QuestionEvol:
 			prompt_variants = existing_variants
 		with open(save_file, "w") as f:
 			json.dump(prompt_variants, f)
+		logger.info("Saving question prompt variants to {}".format(save_file))
 
 if __name__ == "__main__":
 	model_name = "gpt-4-turbo"

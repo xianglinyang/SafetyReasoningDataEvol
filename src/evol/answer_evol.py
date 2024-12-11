@@ -9,9 +9,12 @@ import random
 import os
 import json
 import asyncio
+import logging
 
 from src.llm_zoo.api_base_models import OpenAILLM
 from src.evol import __strategies__
+
+logger = logging.getLogger(__name__)
 # --------------------Answer Format Templates--------------------
 # TODO: currently we only attach constraints to the question. We can consider using more advanced model to automatically extract constraints from the question.
 # 1. Analysis Request
@@ -103,8 +106,7 @@ class AnswerEvol:
     
     async def generate_reasoning_variants_with_strategy(self, strategy_name, model_name, num_variants):
         reasoning_prompt = self.createReasoningPrompt(strategy_name)
-        print(reasoning_prompt)
-        print("-"*50)
+        logger.info(f"Generated reasoning prompt: {reasoning_prompt}")
 
         new_variants = [reasoning_prompt]
         while len(new_variants) < num_variants:
@@ -112,6 +114,7 @@ class AnswerEvol:
             rephrase_prompt = self.createRephrasePrompt(seed_prompt)
             llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
             new_prompt = await llm.invoke(rephrase_prompt)
+            logger.info(f"Generated new prompt: {new_prompt}")
             if self.clean_prompt(new_prompt):
                 new_variants.append(new_prompt)
         new_variants = [self.clean_prompt(prompt) for prompt in new_variants]
@@ -122,8 +125,7 @@ class AnswerEvol:
         for strategy_name in self._strategies:
             reasoning_prompt = self.createAnswerPrompt_wo_category(strategy_name)
             new_variants.append(reasoning_prompt)
-            print(reasoning_prompt)
-            print("-"*50)
+            logger.info(f"Generated reasoning prompt: {reasoning_prompt}")
         while len(new_variants) < num_variants:
             seed_prompt = random.choice(new_variants)
             rephrase_prompt = self.createRephrasePrompt(seed_prompt)
@@ -131,8 +133,7 @@ class AnswerEvol:
             new_prompt = await llm.invoke(rephrase_prompt)
             if self.clean_prompt(new_prompt, category=False):
                 new_variants.append(new_prompt)
-                print(len(new_variants))
-                print(new_prompt)
+                logger.info(f"Generated new prompt: {new_prompt}")
         new_variants = [self.clean_prompt(prompt, category=False) for prompt in new_variants]
         return new_variants
         
@@ -149,8 +150,10 @@ class AnswerEvol:
 
 if __name__ == "__main__":
     import asyncio
+    from src.logger.config import setup_logging
     
     async def main():
+        setup_logging(task_name="test")
         
         num_variants_per_class = 100
         model_name = "gpt-4o"
@@ -158,16 +161,14 @@ if __name__ == "__main__":
         answer_evol = AnswerEvol()
 
         for strategy in ["DISTRACTED_QUESTION", "SUPPRESS_REFUSAL", "AFFIRMATIVE_OUTPUT", "ROLE_PLAY_STORY"]:
-            print(f"Generating {num_variants_per_class} variants for {strategy}...")
+            logger.info(f"Generating {num_variants_per_class} variants for {strategy}...")
             answer_variants = await answer_evol.generate_reasoning_variants_with_strategy(strategy, model_name, num_variants_per_class)
             answer_evol.save_answer_variants(strategy, answer_variants)
-            print(f"Saved {len(answer_variants)} variants for {strategy}.")
-            print("*"*50)
+            logger.info(f"Saved {len(answer_variants)} variants for {strategy}.")
 
         answer_variants = await answer_evol.generate_simplified_answer_variants(model_name, num_variants_per_class)
         answer_evol.save_answer_variants("simplified", answer_variants)
-        print(f"Saved {len(answer_variants)} variants for simplified version.")
-        print("*"*50)
+        logger.info(f"Saved {len(answer_variants)} variants for simplified version.")
 
     asyncio.run(main())
     

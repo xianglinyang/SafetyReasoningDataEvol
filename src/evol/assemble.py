@@ -13,9 +13,11 @@ The steps are:
 import os
 import json
 import requests
+import logging
 
 from src.evol.questions import QuestionStrategy
 from src.evol.answers import AnswerStrategy
+logger = logging.getLogger(__name__)
 
 #-------------------------Data evolution-------------------------
 class DataEvolver:
@@ -26,13 +28,13 @@ class DataEvolver:
     def evol_question(self, question: str) -> str:
         """Evolve a single question using sampled strategy"""
         question_instance = self.question_strategy.enrich_question(question)
-        print("Question instance: ", question_instance)
+        logger.info(f"Question instance: {question_instance}")
         return question_instance
     
     def evol_answer(self, question: str, question_category=None) -> str:
         """Evolve an answer using the same strategy as the question"""
         answer_instance = self.answer_strategy.enrich_answer(question, question_category)
-        print("Answer instance: ", answer_instance)
+        logger.info(f"Answer instance: {answer_instance}")
         return answer_instance
 
     def evol_data(self, question: str, question_category=None) -> tuple:
@@ -78,7 +80,7 @@ def dump_json(dataset, file_path):
     with open(file_path, "w") as file:
         json.dump(dataset, file, indent=4)
 
-    print(f"Dataset saved to {file_path}")
+    logger.info(f"Dataset saved to {file_path}")
 
 
 def download_circuitbreaker_dataset(train):
@@ -89,7 +91,7 @@ def download_circuitbreaker_dataset(train):
     file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
     
     download_file(file, file_path)
-    print(f"Circuitbreaker {file_path} downloaded")
+    logger.info(f"Circuitbreaker {file_path} downloaded")
 
 
 def process_circuitbreaker_dataset(train):
@@ -118,10 +120,13 @@ def process_circuitbreaker_dataset(train):
             "question": question
         })
     dump_json(evolved_dataset, processed_file_path)
-    print("Evolved train dataset saved to ", processed_file_path)
+    logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
 #-------------------------Main-------------------------
 def main():
+    from src.logger.config import setup_logging
+    setup_logging(task_name="test")
+    
     download_circuitbreaker_dataset(train=True)
     download_circuitbreaker_dataset(train=False)
     process_circuitbreaker_dataset(train=True) 
