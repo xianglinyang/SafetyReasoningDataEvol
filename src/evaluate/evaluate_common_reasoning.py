@@ -43,11 +43,12 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
         llm_answer = llm.invoke(question)
 
         logger.info(f"{idx} Question: {question}")
+        logger.info(f"[GT answer]: {answer}")
+        logger.info(f"[LLM Answer]: {llm_answer}")
         pred_answer = answer_cleansing(dataset_name, llm_answer)
         answer = gt_answer_cleansing(dataset_name, answer)
-        logger.info(f"[Cleaning]: {answer == pred_answer}")
-        logger.info(f"[GT answer]: {answer}")
         logger.info(f"[Pred answer]: {pred_answer}")
+        logger.info(f"[Cleaning]: {answer == pred_answer}")
         correct[i] = int(answer == pred_answer)
 
     t1 = time.time()
@@ -101,35 +102,33 @@ def main():
 
     # read args
     model_name_or_path = args.model_path
-    model_abbr = args.model_abbr
     torch_type = args.torch_type
     dataset_name = args.dataset_name
     split = args.split
     eval_num = args.eval_num
     device = args.device
 
-    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, model_abbr=model_abbr, torch_dtype=torch_type, device=device)
+    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
     evaluate_reasoning(llm, dataset_name, dataset, eval_num)
 
 def test():
-    from src.logger.config import setup_logging
-    setup_logging(task_name="test")
-    
     # test input
     model_name_or_path = "out"
-    model_abbr = "llama2"
     torch_type = torch.bfloat16
-    dataset_name = "gsm8k"
+    dataset_name = "mmlu"
     split = "test"
-    eval_num = 20
+    eval_num = 5
     device = "cuda:0"
 
-    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, model_abbr=model_abbr, torch_dtype=torch_type, device=device)
+    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
     evaluate_reasoning(llm, dataset_name, dataset, eval_num)
 
 if __name__ == "__main__":
     from src.logger.config import setup_logging
-    setup_logging(task_name="evaluate_loss")
-    main()
+    # setup_logging(task_name="evaluate_loss")
+    # main()
+
+    setup_logging(task_name="test")
+    test()

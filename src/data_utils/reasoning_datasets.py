@@ -1,17 +1,36 @@
-# # Problem:
-# Arithmetic reasoning
-#     1. gsm8k
-#     2. AQuA
-#     3. SVAMP
-#     4. MAWPS: multiarith
-# commonsense reasoning:
-#     1. commonsensqa
-#     2. Big-Bench: Date understanding , StrategyQA, Shuffled Objects
-# Symbolic reasoning
-#     1. Last Letters
-#     2. Coin Flip
-# coding:
-#     1. code generation from codeforces
+'''
+General:
+1. MMLU
+2. Commonsensqa
+3. bbh
+4. arc
+
+Knowledge reasoning:
+1. TriviaQA-Wiki
+
+Reading Comprehension:
+1. SQuAD
+
+Code:
+1. HumanEval
+
+Math:
+1. gsm8k
+2. AQuA
+3. SVAMP
+4. MAWPS: multiarith
+
+Symbolic reasoning:
+1. Last Letters
+2. Coin Flip
+
+Online Test:
+1. Open LLM Leaderboard
+2. MT benchmark
+
+bbh, mmlu, triviaqa, squad, humaneval
+'''
+
 
 # "gsm8k" "aqua" "svamp" "multiarith" "commonsenseqa" "date_understanding" "strategyqa" "tracking_shuffled_objects" "last_letters" "coin_flip"
 '''Adapted from https://github.com/kojima-takeshi188/zero_shot_cot'''
@@ -178,6 +197,7 @@ def data_reader(dataset_name, split):
 
             questions.append(question)
             answers.append(answer)
+
     elif dataset_name == "shuffled_objects":
         tso = load_dataset("hails/bigbench", "tracking_shuffled_objects_zero_shot")
         if split == "train":
@@ -199,6 +219,38 @@ def data_reader(dataset_name, split):
 
             choice = "Answer Choices:"
             for label, text in zip(all_options, options):
+                choice += " ("
+                choice += label
+                choice += ") "
+                choice += text
+
+            questions.append(question.strip() + " " + choice)
+            answers.append(answer)
+    
+    elif dataset_name == "mmlu":
+        ds = load_dataset("cais/mmlu", "all")
+        # load_dataset("cais/mmlu", "abstract_algebra")
+        if split == "test":
+            data = ds['test']
+        elif split == "validation":
+            data = ds['validation']
+        elif split == "dev":
+            data = ds['dev']
+        else:
+            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        
+        score_to_choices = lambda x: chr(ord('A')+x)
+        all_options = ['A', 'B', 'C', 'D']
+        
+        for item in data:
+            question = item['question']
+            choices = item['choices']
+            answer = item['answer']
+
+            answer = score_to_choices(int(answer))
+
+            choice = "Answer Choices:"
+            for label, text in zip(all_options, choices):
                 choice += " ("
                 choice += label
                 choice += ") "
@@ -253,10 +305,7 @@ class ReasoningDataset(Dataset):
     
 
 def answer_cleansing(dataset, llm_answer):
-    print("LLM message:")
-    llm_answer = llm_answer.replace("\n\n", "\n").replace("\n", " ").strip()
-    print(llm_answer)
-    pred = llm_answer
+    pred = llm_answer.replace("\n\n", "\n").replace("\n", " ").strip()
     
     if dataset in ("aqua", "commonsenseqa"):
         pred = re.findall(r'A|B|C|D|E', pred)
@@ -264,6 +313,8 @@ def answer_cleansing(dataset, llm_answer):
         pred = re.findall(r'A|B|C|D|E|F', pred)
     elif dataset in ("object_tracking"):
         pred = re.findall(r'A|B|C', pred)
+    elif dataset == "mmlu":
+        pred = re.findall(r'A|B|C|D', pred)
     elif dataset in ("gsm8k", "multiarith", "svamp"):
         pred = pred.replace(",", "")
         pred = [s for s in re.findall(r'-?\d+\.?\d*', pred)]
@@ -286,8 +337,7 @@ def answer_cleansing(dataset, llm_answer):
             answer = answer[:-1]
         elif answer.endswith(".00"):
             answer = answer[:-3]
-    print("")
-    print("pred_after : " + answer)
+
     return answer
 
 
