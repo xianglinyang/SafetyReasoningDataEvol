@@ -23,7 +23,7 @@ import torch
 import argparse
 
 from src.llm_zoo.code_base_models import HuggingFaceLLM
-from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing
+from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing, zero_shot_answer_trigger
 
 logger = logging.getLogger(__name__)
 
@@ -32,15 +32,19 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
 
     if eval_num == -1:
         eval_idxs = list(range(len(dataset)))
+    elif eval_num > len(dataset):
+        eval_idxs = list(range(len(dataset)))
+        eval_num = len(dataset)
     else:
         eval_idxs = random.sample(range(len(dataset)), eval_num)
 
     correct = [0]*len(eval_idxs)
+    trigger = zero_shot_answer_trigger(dataset_name)
 
     for i in tqdm(range(len(eval_idxs))):
         idx = eval_idxs[i]
         question, _, answer = dataset[idx]
-        llm_answer = llm.invoke(question)
+        llm_answer = llm.invoke(question+" "+trigger)
 
         logger.info(f"{idx} Question: {question}")
         logger.info(f"[GT answer]: {answer}")
@@ -62,7 +66,7 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
     return accu, correct, eval_idxs
 
 
-def save_results(accu, correct, eval_idxs, dataset_name, model_name_or_path, split, save_path="eval_results"):
+def save_results(accu, dataset_name, model_name_or_path, split, eval_num, save_path="eval_results"):
     common_ability_path = f"{save_path}/common_ability.json"
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
@@ -75,11 +79,10 @@ def save_results(accu, correct, eval_idxs, dataset_name, model_name_or_path, spl
 
     results = {
         "accu": accu,
-        "correct": correct,
-        "eval_idxs": eval_idxs,
         "dataset_name": dataset_name,
         "model_name_or_path": model_name_or_path,
-        "split": split
+        "split": split,
+        "eval_num": eval_num
     }
     common_ability.append(results)
     
@@ -93,8 +96,9 @@ def main():
     parser.add_argument("--model_name_or_path", type=str)
     parser.add_argument("--dataset_name", type=str, default="gsm8k")
     parser.add_argument("--split", type=str, default="test")
-    parser.add_argument("--eval_num", type=int)
+    parser.add_argument("--eval_num", type=int, default=-1)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
     args = parser.parse_args()
 
     # log the args
@@ -108,9 +112,19 @@ def main():
     eval_num = args.eval_num
     device = args.device
 
+    if torch_type == "bf16":
+        torch_type = torch.bfloat16
+    elif torch_type == "fp16":
+        torch_type = torch.float16
+    elif torch_type == "fp32":
+        torch_type = torch.float32
+    else:
+        raise ValueError(f"Invalid torch_type: {torch_type}")
+
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
-    evaluate_reasoning(llm, dataset_name, dataset, eval_num)
+    accu, correct, eval_idxs = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
+    save_results(accu, dataset_name, model_name_or_path, split, eval_num)
 
 def test():
     # test input
@@ -123,7 +137,8 @@ def test():
 
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
-    evaluate_reasoning(llm, dataset_name, dataset, eval_num)
+    accu, correct, eval_idxs = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
+    save_results(accu, dataset_name, model_name_or_path, split, eval_num)
 
 if __name__ == "__main__":
     from src.logger.config import setup_logging

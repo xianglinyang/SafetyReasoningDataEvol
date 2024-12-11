@@ -3,6 +3,9 @@ General:
 1. MMLU
 2. Commonsensqa
 3. bbh
+    date_understanding
+    strategyqa
+    tracking_shuffled_objects
 4. arc
 
 Knowledge reasoning:
@@ -27,13 +30,12 @@ Symbolic reasoning:
 Online Test:
 1. Open LLM Leaderboard
 2. MT benchmark
-
-bbh, mmlu, triviaqa, squad, humaneval
 '''
-
 
 # "gsm8k" "aqua" "svamp" "multiarith" "commonsenseqa" "date_understanding" "strategyqa" "tracking_shuffled_objects" "last_letters" "coin_flip"
 '''Adapted from https://github.com/kojima-takeshi188/zero_shot_cot'''
+
+# TODO: bbh, triviaqa, squad, humaneval
 
 import re
 import json
@@ -354,6 +356,8 @@ def zero_shot_answer_trigger(dataset):
     trigger = "The answer is"
     if dataset in ("aqua", "commonsenseqa"):
         trigger = "Among A through E, the answer is"
+    elif dataset == "mmlu":
+        trigger = "Among A through D, the answer is"
     elif dataset in("gsm8k", "multiarith", "svamp"):
         trigger = "The answer (arabic numerals) is"
     elif dataset in ("strategyqa", "coin_flip"):
