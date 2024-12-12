@@ -20,7 +20,9 @@ import time
 import litellm
 import argparse
 import logging
+import fcntl
 
+from src.logger.config import setup_logging
 from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
@@ -256,17 +258,37 @@ def evaluate_jailbreak(
 def save_evaluation(results: Dict, path="eval_results"):
     if not os.path.exists(os.path.dirname(path)):
         os.makedirs(os.path.dirname(path))
-    if os.path.exists(path):
-       with open(path, "r") as f:
-           existing_evaluation = json.load(f)
-    else:
-        existing_evaluation = list()
-
-    existing_evaluation.append(results)
+    
     save_file = os.path.join(path, "evaluate_harmful.json")
-    with open(save_file, "w") as f:
-        json.dump(existing_evaluation, f)
-        print(f"Evaluation results saved at {save_file}")
+    max_retries = 5
+    retry_delay = 1
+    
+    for attempt in range(max_retries):
+        try:
+            with open(save_file, 'a+') as f:  # Use a+ mode to create if not exists
+                # Acquire an exclusive lock
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                try:
+                    try:
+                        existing_evaluation = json.load(f)
+                    except (json.JSONDecodeError, ValueError):
+                        # File is empty or invalid JSON
+                        existing_evaluation = list()
+                    
+                    # Add new results
+                    existing_evaluation.append(results)
+                    json.dump(existing_evaluation, f)
+
+                    logger.info(f"Evaluation results saved at {save_file}")
+                    return True
+                finally:
+                    # Release the lock
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to save results after {max_retries} attempts: {e}")
+                return False
+            time.sleep(retry_delay)
 
 
 def main():
@@ -278,7 +300,10 @@ def main():
     parser.add_argument("--eval_num", type=int, default=-1)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--attack_name", type=str)
+    parser.add_argument("--run_id", type=str, help="Unique identifier for this run for logging")
     args = parser.parse_args()
+
+    setup_logging(task_name="evaluate_harmful", run_id=args.run_id)
 
     logger.info(f"Evaluating Arguments: {args}")
     
@@ -319,8 +344,6 @@ def main():
     save_evaluation(results)
 
 if __name__ == "__main__":
-    from src.logger.config import setup_logging
-    setup_logging(task_name="evaluate_harmful")
     main()
 
 

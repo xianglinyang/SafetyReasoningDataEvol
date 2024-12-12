@@ -21,7 +21,10 @@ from tqdm import tqdm
 import logging
 import torch
 import argparse
+import fcntl
 
+
+from src.logger.config import setup_logging
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing, zero_shot_answer_trigger
 
@@ -66,32 +69,45 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
     return accu, correct, eval_idxs
 
 
-def save_results(accu, dataset_name, model_name_or_path, split, eval_num, save_path="eval_results"):
-    common_ability_path = f"{save_path}/common_ability.json"
+def save_results(results, save_path="eval_results"):
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
-
-    if os.path.exists(common_ability_path):
-        with open(common_ability_path, "r") as f:
-            common_ability = json.load(f)
-    else:
-        common_ability = list()
-
-    results = {
-        "accu": accu,
-        "dataset_name": dataset_name,
-        "model_name_or_path": model_name_or_path,
-        "split": split,
-        "eval_num": eval_num
-    }
-    common_ability.append(results)
     
-    with open(common_ability_path, "w") as f:
-        json.dump(common_ability, f)
-    return results
+    save_file = os.path.join(save_path, "common_ability.json")
+    max_retries = 5
+    retry_delay = 1
     
+    for attempt in range(max_retries):
+        try:
+            with open(save_file, 'a+') as f:  # Use a+ mode to create if not exists
+                # Acquire an exclusive lock
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                try:
+                    try:
+                        existing_evaluation = json.load(f)
+                    except (json.JSONDecodeError, ValueError):
+                        # File is empty or invalid JSON
+                        existing_evaluation = list()
+                    
+                    # Add new results
+                    existing_evaluation.append(results)
+                    json.dump(existing_evaluation, f)
+
+                    logger.info(f"Evaluation results saved at {save_file}")
+                    return True
+                finally:
+                    # Release the lock
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to save results after {max_retries} attempts: {e}")
+                return False
+            time.sleep(retry_delay)
+
 
 def main():
+    
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", type=str)
     parser.add_argument("--dataset_name", type=str, default="gsm8k")
@@ -99,7 +115,10 @@ def main():
     parser.add_argument("--eval_num", type=int, default=-1)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
+    parser.add_argument("--run_id", type=str, default=None)
     args = parser.parse_args()
+
+    setup_logging(task_name="evaluate_loss", run_id=args.run_id)
 
     # log the args
     logger.info(f"Arguments: {args}")
@@ -124,23 +143,17 @@ def main():
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
     accu, correct, eval_idxs = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
-    save_results(accu, dataset_name, model_name_or_path, split, eval_num)
 
-def test():
-    # test input
-    model_name_or_path = "out"
-    torch_type = torch.bfloat16
-    dataset_name = "mmlu"
-    split = "test"
-    eval_num = 5
-    device = "cuda:0"
+    results = {
+        "accu": accu,
+        "dataset_name": dataset_name,
+        "model_name_or_path": model_name_or_path,
+        "split": split,
+        "eval_num": eval_num
+    }
+    logger.info(f"Evaluation results: {results}")
+    save_results(results)
 
-    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
-    dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
-    accu, correct, eval_idxs = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
-    save_results(accu, dataset_name, model_name_or_path, split, eval_num)
 
 if __name__ == "__main__":
-    from src.logger.config import setup_logging
-    setup_logging(task_name="evaluate_loss")
     main()
