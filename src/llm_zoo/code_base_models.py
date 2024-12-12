@@ -31,7 +31,7 @@ class HuggingFaceLLM(BaseLLM):
         self.model_name_or_path=model_name_or_path
         self.torch_dtype=torch_dtype
         self.device=device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+        self._load_tokenizer(model_name_or_path)
         self._load_model(model_name_or_path, device, torch_dtype)
 
     def _load_tokenizer(self, model_name_or_path):
