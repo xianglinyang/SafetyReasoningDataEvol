@@ -26,7 +26,7 @@ import fcntl
 
 from src.logger.config import setup_logging
 from src.llm_zoo.code_base_models import HuggingFaceLLM
-from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing, zero_shot_answer_trigger
+from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing_with_llm, zero_shot_answer_trigger
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
         logger.info(f"{idx} Question: {question}")
         logger.info(f"[GT answer]: {answer}")
         logger.info(f"[LLM Answer]: {llm_answer}")
-        pred_answer = answer_cleansing(dataset_name, llm_answer)
+        pred_answer = answer_cleansing_with_llm(dataset_name, llm_answer)
         answer = gt_answer_cleansing(dataset_name, answer)
         logger.info(f"[Pred answer]: {pred_answer}")
         logger.info(f"[Cleaning]: {answer == pred_answer}")
