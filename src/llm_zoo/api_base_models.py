@@ -20,45 +20,40 @@ SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant."
 '''Model class of different providers'''
 class OpenAILLM(BaseLLM):
     """OpenAI LLM wrapper that supports both chat and instruct models"""
-    
-    # GPT-4o models
-    GPT4O_MODELS = {
-        "gpt-4o",                          # Latest flagship model
-        "gpt-4o-2024-11-20",              # November snapshot
-        "gpt-4o-2024-08-06",              # August snapshot with Structured Outputs
-        "gpt-4o-2024-05-13",              # Original snapshot
-        "chatgpt-4o-latest",              # Dynamic ChatGPT version
+    MODEL_CATEGORIES = {
+        "chat": [
+            "chatgpt-4o-latest",
+            "gpt-4-turbo",
+            "gpt-4-turbo-2024-04-09",
+            "gpt-4",
+            "gpt-4-32k",
+            "gpt-4-0125-preview",
+            "gpt-4-1106-preview",
+            "gpt-4-vision-preview",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-3.5-turbo-0125",
+            "gpt-3.5-turbo-1106",
+            "gpt-3.5-turbo-0613",
+            "gpt-3.5-turbo-16k-0613",
+            "gpt-3.5-turbo-0301"
+        ],
+        "instruct": [
+            "davinci-002",
+            "babbage-002",
+            "gpt-3.5-turbo-instruct",
+        ],
+        "embedding": [
+            "text-embedding-3-small",
+            "text-embedding-3-large",
+            "ada v2"
+        ]
     }
     
-    # GPT-4o mini models
-    GPT4O_MINI_MODELS = {
-        "gpt-4o-mini",                     # Latest mini model
-        "gpt-4o-mini-2024-07-18",         # July snapshot
-    }
-    
-    # GPT-4 Turbo and GPT-4 models
-    GPT4_MODELS = {
-        "gpt-4-turbo",                     # Latest GPT-4 Turbo with vision
-        "gpt-4-turbo-2024-04-09",         # April snapshot
-        "gpt-4-turbo-preview",             # Preview version
-        "gpt-4-0125-preview",             # January preview
-        "gpt-4-1106-preview",             # November preview
-        "gpt-4",                          # Standard GPT-4
-        "gpt-4-0613",                     # June snapshot
-        "gpt-4-0314",                     # March snapshot
-    }
-    
-    # GPT-3.5 Turbo models
-    GPT35_MODELS = {
-        "gpt-3.5-turbo",                  # Latest version
-        "gpt-3.5-turbo-0125",             # January snapshot
-        "gpt-3.5-turbo-1106",             # November snapshot
-        "gpt-3.5-turbo-instruct",         # Instruct version
-    }
     
     # Combined sets for API usage
-    CHAT_MODELS = GPT4O_MODELS | GPT4O_MINI_MODELS | GPT4_MODELS | GPT35_MODELS - {"gpt-3.5-turbo-instruct"}
-    INSTRUCT_MODELS = {"gpt-3.5-turbo-instruct"}
+    CHAT_MODELS = MODEL_CATEGORIES["chat"]
+    INSTRUCT_MODELS = MODEL_CATEGORIES["instruct"]
     
     def __init__(self, model_name: str = "gpt-4", **kwargs):
         super().__init__(model_name, **kwargs)
@@ -91,7 +86,7 @@ class OpenAILLM(BaseLLM):
 
 '''helper functions'''
 LLM_MODELS = {
-    "OPENAI_LLM": OpenAILLM.CHAT_MODELS | OpenAILLM.INSTRUCT_MODELS,
+    "OPENAI_LLM": OpenAILLM.CHAT_MODELS + OpenAILLM.INSTRUCT_MODELS,
 }
 
 async def llm_generate(model_name: str, prompt: str, **kwargs) -> str:
