@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 import time
-from pathlib import Path
 
 def setup_logging(
     task_name, # train, eval, etc.
@@ -10,10 +9,6 @@ def setup_logging(
     log_dir="logs",
     run_id=None,
 ):
-
-    # Include run_id in the log filename if provided
-    log_file = f"{task_name}_{run_id}.log" if run_id else f"{task_name}.log"
-    log_path = os.path.join(log_dir, log_file)
 
     # Create logs directory if it doesn't exist
     log_dir = os.path.join(log_dir, task_name)
