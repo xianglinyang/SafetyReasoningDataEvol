@@ -42,6 +42,8 @@ import json
 from datasets import load_dataset
 from torch.utils.data import Dataset
 
+from src.llm_zoo.api_base_models import OpenAILLM
+
 def data_reader(dataset_name, split):
     questions = list()
     rationales = list()
@@ -304,9 +306,10 @@ class ReasoningDataset(Dataset):
         rationale = self.rationales[index]
         answer = self.answers[index]
         return question, rationale, answer
-    
 
-def answer_cleansing(dataset, llm_answer):
+
+# answer cleansing with 4o-mini or regular expression matching
+def answer_cleansing_with_regex(dataset, llm_answer):
     pred = llm_answer.replace("\n\n", "\n").replace("\n", " ").strip()
     
     if dataset in ("aqua", "commonsenseqa"):
@@ -343,9 +346,28 @@ def answer_cleansing(dataset, llm_answer):
     return answer
 
 
+def answer_cleansing_with_llm(dataset, llm_answer, llm):
+    # use 4o-mini or 7b model to extract the answer from the reasoning output
+    # Currently, we use 4o-mini model to extract the answer from the reasoning output
+    llm = OpenAILLM(model_name="gpt-4o-mini")
+    cleansing_prompt = f"""\
+    #### Instruction
+    You are a helpful and precise assistant. \
+    Your task is to extract the final answer from the given reasoning output. \
+    The answer should be concise and directly reflect the conclusion of the reasoning. If the reasoning does not contain a clear answer, return "[INVALID]".
+
+    #### Reasoning Output
+    {llm_answer}
+
+    #### Extracted Answer
+    {zero_shot_answer_trigger(dataset)}
+    """
+    response = llm.invoke(cleansing_prompt)
+    return response
+
+
 def gt_answer_cleansing(dataset, answer):
     pred = answer
-
     if dataset in ("gsm8k"):
         pred = pred.replace(",", "")
 
@@ -365,8 +387,7 @@ def zero_shot_answer_trigger(dataset):
     elif dataset in ("bigbench_date"):
         trigger = "Among A through F, the answer is"
     elif dataset in ("object_tracking"):
-        trigger = "Among A through C, the answer is"
-    
+        trigger = "Among A through C, the answer is" 
     return trigger
 
             
