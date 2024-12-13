@@ -14,8 +14,10 @@ import os
 import json
 import asyncio
 import logging
+import argparse
 
 from src.llm_zoo.api_base_models import OpenAILLM
+from src.logger.config import setup_logging
 from src.evol import __strategies__
 
 logger = logging.getLogger(__name__)
@@ -135,8 +137,8 @@ class QuestionEvol:
     # --------------------Utils--------------------
 	def clean_prompt(self, prompt):
 		# format the output and filter out the invalid prompt
-		logger.info("Cleaning prompt to remove ###question###: {}".format(prompt))
 		if "###question###" in prompt:
+			logger.info("Cleaning prompt to remove ###question###: {}".format(prompt))
 			prompt = prompt.replace("###question###", "{question}")
 			return prompt
 		else:
@@ -151,17 +153,16 @@ class QuestionEvol:
 		seed_prompts = []
 		while len(seed_prompts) < num_seed:
 			prompt_rephraser = self.createRephrasePrompt(prompt_template)
-			# Remove asyncio.run() since we're already in an async function
 			llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=200)
 			seed_prompt = await llm.invoke(prompt_rephraser)
-			# seed_prompt = await llm_generate(model_name=model_name, temperature=0.7, max_tokens=200, prompt=prompt_rephraser)
+			logger.info(f"Generated seed prompt: {seed_prompt}")
 			if INPUT_FORMAT in seed_prompt:
 				seed_prompts.append(seed_prompt)
 		logger.info(f"Generated {len(seed_prompts)} seed prompts")
 
 		# 2. enrich the seed prompt with the strategy
 		prompt_variants = []
-		while len(prompt_variants) < num_variants:
+		while len(prompt_variants) < num_variants-len(seed_prompts):
 			# 2.1 sample a seed prompt
 			seed_prompt = random.choice(seed_prompts)
 			# 2.2 enrich the seed prompt with the strategy
@@ -176,6 +177,10 @@ class QuestionEvol:
 				prompt_variants.append(new_prompt.strip())
 			logger.info(f"Generated {len(prompt_variants)} prompt variants")
 		
+		# finally, add the seed prompts to the prompt variants
+		for seed_prompt in seed_prompts:
+			prompt_variants.append(self.clean_prompt(seed_prompt))
+
 		return prompt_variants
 	
 	def save_prompt_variants(self, strategy_name, prompt_variants, save_path="data/prompt_variants/questions"):
@@ -190,16 +195,31 @@ class QuestionEvol:
 			json.dump(prompt_variants, f)
 		logger.info("Saving question prompt variants to {}".format(save_file))
 
-if __name__ == "__main__":
-	model_name = "gpt-4-turbo"
-	async def main(strategy_name):
-		question_evol = QuestionEvol()
-		prompt_variants = await question_evol.generate_prompt_variants_with_strategy(strategy_name, model_name=model_name, num_seed=10, num_variants=500)
+
+async def main():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("--model_name", '-m', type=str, default="gpt-4-turbo")
+	parser.add_argument("--num_seed", '-n', type=int, default=250, help="number of seed prompts for each strategy")
+	parser.add_argument("--num_variants", '-v', type=int, default=1250, help="number of prompt variants for each strategy")
+	parser.add_argument("--run_id", '-r', type=int)
+	args = parser.parse_args()
+
+	model_name = args.model_name
+	num_seed = args.num_seed
+	num_variants = args.num_variants
+	run_id = args.run_id
+
+	setup_logging(task_name="data_evol", run_id=run_id)
+	logger.info(f"Generating question prompt variants")
+	logger.info(f"Hyperparameters: {args}")
+
+	question_evol = QuestionEvol()
+	for strategy_name in ["SUPPRESS_REFUSAL", "DISTRACTED_QUESTION", "ROLE_PLAY_STORY", "AFFIRMATIVE_OUTPUT"]:
+		prompt_variants = await question_evol.generate_prompt_variants_with_strategy(strategy_name, model_name=model_name, num_seed=num_seed, num_variants=num_variants)
 		question_evol.save_prompt_variants(strategy_name.lower(), prompt_variants)	
-	asyncio.run(main("SUPPRESS_REFUSAL"))
-	asyncio.run(main("DISTRACTED_QUESTION"))
-	asyncio.run(main("ROLE_PLAY_STORY"))
-	asyncio.run(main("AFFIRMATIVE_OUTPUT"))
+
+if __name__ == "__main__":
+	asyncio.run(main())
 	
 
 

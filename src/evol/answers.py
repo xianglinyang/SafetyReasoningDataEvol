@@ -15,8 +15,17 @@ class AnswerStrategy:
 	def __init__(self):
 		self.name = "AnswerStrategy"
 		self.template_path = "data/prompt_variants/answers"
-		self.templates = {}
 		self._strategies = __strategies__
+		self._templates = self._load_templates()
+	
+	def _load_templates(self):
+		self.templates = {}
+		for strategy in __strategies__:
+			file_path = os.path.join(self.template_path, f"{strategy.lower()}.json")
+			assert os.path.exists(file_path), f"Template file for strategy {strategy} does not exist. Initialize the template from answer_evol.py first."
+			with open(file_path, "r") as f:
+				templates = json.load(f)
+			self.templates[strategy] = templates
 	
 	def sample_strategy(self):
 		"""Randomly select a strategy"""
@@ -25,13 +34,6 @@ class AnswerStrategy:
 	
 	def strategy2answer_template(self, strategy):
 		"""Get answer template for the given strategy"""
-		if strategy not in self.templates:
-			# sample one template from a json file with predefined templates for each strategy
-			file_path = os.path.join(self.template_path, f"{strategy.lower()}.json")
-			assert os.path.exists(file_path), f"Template file for strategy {strategy} does not exist. Initialize the template from answer_evol.py first."
-			with open(file_path, "r") as f:
-				templates = json.load(f)
-			self.templates[strategy] = templates
 		template = random.choice(self.templates[strategy])
 		return template
 	

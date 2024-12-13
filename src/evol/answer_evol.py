@@ -163,8 +163,8 @@ class AnswerEvol:
 
 async def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_variants_per_class", '-n', type=int, default=100)
-    parser.add_argument("--model_name", '-m', type=str, default="gpt-4o")
+    parser.add_argument("--num_variants_per_class", '-n', type=int, default=1250)
+    parser.add_argument("--model_name", '-m', type=str, default="gpt-4-turbo")
     parser.add_argument("--run_id", '-r', type=int)
     
     args = parser.parse_args()
