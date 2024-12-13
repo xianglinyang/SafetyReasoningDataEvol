@@ -15,6 +15,7 @@ import json
 import requests
 import random
 import logging
+import argparse
 
 from src.evol.questions import QuestionStrategy
 from src.evol.answers import AnswerStrategy
@@ -165,7 +166,12 @@ def process_circuitbreaker_dataset(train):
 
 #-------------------------Main-------------------------
 def main():
-    setup_logging(task_name="data_evol")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run_id", '-r', type=int)
+    args = parser.parse_args()
+    run_id = args.run_id
+
+    setup_logging(task_name="data_evol", run_id=run_id)
     logger.info("Assembling data...")
 
     logger.info("Downloading circuitbreaker dataset...")
