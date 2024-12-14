@@ -103,17 +103,14 @@ class AnswerEvol:
     # --------------------Utils--------------------
     def clean_prompt(self, prompt: str, category: bool = True) -> str:
         """Clean and format the prompt"""
-        if prompt.startswith("####"):
-            if "###question###" in prompt:
-                prompt = prompt.replace("###question###", "{question}")
-                
-                if category and "###category###" in prompt:
+        if prompt.startswith("####") and "###question###" in prompt:
+            if category:
+                if "###category###" in prompt:
                     prompt = prompt.replace("###category###", "{category}")
-                    return prompt
                 else:
-                    return prompt
-            else:
-                return None
+                    return None
+            prompt = prompt.replace("###question###", "{question}")
+            return prompt
         else:
             return None
     
