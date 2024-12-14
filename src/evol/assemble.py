@@ -64,9 +64,9 @@ class DataEvolver:
         answer_instance = answer_template.format(question=question, question_category=question_category)
         return question_instance, answer_instance
     
-    def evol_data(self, question_template, answer_template, question: str, question_category="harmful and toxic content"):
+    def evol_data(self, question_template, answer_template, question: str, question_category: str):
         question_instance = question_template.format(question=question)
-        answer_instance = answer_template.format(question=question, question_category=question_category)
+        answer_instance = answer_template.format(question=question, category=question_category)
         return question_instance, answer_instance
     
     def evol_dataset(self, dataset: list) -> list:
@@ -83,6 +83,8 @@ class DataEvolver:
 
         evolved_dataset = list()
         for (question, question_category), (question_template, answer_template) in zip(dataset, all_qa_pairs):
+            if question_category is None:
+                question_category = "harmful and toxic content"
             question_instance, answer_instance = self.evol_data(question_template, answer_template, question, question_category)
             evolved_dataset.append({
                 "evolved_question": question_instance.strip(),
@@ -120,6 +122,7 @@ def dump_json(dataset, file_path):
 
 
 def download_circuitbreaker_dataset(train):
+    logger.info(f"Downloading circuitbreaker {train} dataset...")
     if train:
         file = "https://raw.githubusercontent.com/GraySwanAI/circuit-breakers/refs/heads/main/data/circuit_breakers_train.json"
     else:
@@ -131,6 +134,7 @@ def download_circuitbreaker_dataset(train):
 
 
 def process_circuitbreaker_dataset(train):
+    logger.info(f"Processing circuitbreaker {train} dataset...")
     raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
 
@@ -138,7 +142,7 @@ def process_circuitbreaker_dataset(train):
     with open(raw_file_path, 'r') as f:
         dataset = json.load(f)
 
-    question_category_pairs = [(dataset[i]['prompt'], dataset[i]['category']) for i in range(len(dataset))]
+    question_category_pairs = [(dataset[i]['prompt'], dataset[i]['category'] if 'category' in dataset[i] else None) for i in range(len(dataset))]
 
     data_evolver = DataEvolver()
     evolved_dataset = data_evolver.evol_dataset(question_category_pairs)
@@ -175,12 +179,12 @@ def main():
     logger.info("Assembling data...")
 
     logger.info("Downloading circuitbreaker dataset...")
-    # download_circuitbreaker_dataset(train=True)
-    # download_circuitbreaker_dataset(train=False)
+    download_circuitbreaker_dataset(train=True)
+    download_circuitbreaker_dataset(train=False)
 
     logger.info("Processing circuitbreaker dataset...")
     process_circuitbreaker_dataset(train=True) 
-    # process_circuitbreaker_dataset(train=False) 
+    process_circuitbreaker_dataset(train=False) 
 
 
 if __name__ == "__main__":
