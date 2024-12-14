@@ -256,8 +256,8 @@ def evaluate_jailbreak(
 
 
 def save_evaluation(results: Dict, path="eval_results"):
-    if not os.path.exists(os.path.dirname(path)):
-        os.makedirs(os.path.dirname(path))
+    if not os.path.exists(path):
+        os.makedirs(path, exist_ok=True)
     
     save_file = os.path.join(path, "evaluate_harmful.json")
     max_retries = 5
@@ -265,28 +265,37 @@ def save_evaluation(results: Dict, path="eval_results"):
     
     for attempt in range(max_retries):
         try:
-            with open(save_file, 'a+') as f:  # Use a+ mode to create if not exists
-                # Acquire an exclusive lock
-                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Open in r+ mode (read and write without truncating)
+            with open(save_file, 'r+' if os.path.exists(save_file) else 'w+') as f:
+                # Acquire lock before doing anything
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 try:
                     try:
+                        # Read existing content
+                        f.seek(0)  # Ensure we're at the start of file
                         existing_evaluation = json.load(f)
-                    except (json.JSONDecodeError, ValueError):
-                        # File is empty or invalid JSON
-                        existing_evaluation = list()
+                    except (ValueError, json.JSONDecodeError):
+                        # Handle empty or invalid file
+                        existing_evaluation = []
                     
-                    # Add new results
-                    existing_evaluation.append(results)
-                    json.dump(existing_evaluation, f)
-
-                    logger.info(f"Evaluation results saved at {save_file}")
+                    # Append new results
+                    existing_evaluation.append(results.copy())
+                    
+                    # Write back entire content
+                    f.seek(0)  # Go back to start
+                    f.truncate()  # Clear existing content
+                    json.dump(existing_evaluation, f, indent=4)
+                    
+                    print(f"Evaluation results saved at {save_file}")
                     return True
+                    
                 finally:
                     # Release the lock
                     fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    
         except Exception as e:
             if attempt == max_retries - 1:
-                logger.error(f"Failed to save results after {max_retries} attempts: {e}")
+                print(f"Failed to save results after {max_retries} attempts: {e}")
                 return False
             time.sleep(retry_delay)
 
