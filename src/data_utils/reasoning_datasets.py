@@ -346,7 +346,7 @@ def answer_cleansing_with_regex(dataset, llm_answer):
     return answer
 
 
-def answer_cleansing_with_llm(dataset, llm_answer):
+async def answer_cleansing_with_llm(dataset, llm_answer):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
     # Currently, we use 4o-mini model to extract the answer from the reasoning output
     llm = OpenAILLM(model_name="gpt-4o-mini")
@@ -362,7 +362,7 @@ def answer_cleansing_with_llm(dataset, llm_answer):
     #### Extracted Answer
     {zero_shot_answer_trigger(dataset)}
     """
-    response = llm.invoke(cleansing_prompt)
+    response = await llm.invoke(cleansing_prompt)
     return response
 
 
@@ -377,17 +377,17 @@ def gt_answer_cleansing(dataset, answer):
 def zero_shot_answer_trigger(dataset):
     trigger = "The answer is"
     if dataset in ("aqua", "commonsenseqa"):
-        trigger = "Among A through E, the answer is"
+        trigger = "You should return only ONE CHARACTER. Among A through E, the answer is "
     elif dataset == "mmlu":
-        trigger = "Among A through D, the answer is"
+        trigger = "You should return only ONE CHARACTER. Among A through D, the answer is "
     elif dataset in("gsm8k", "multiarith", "svamp"):
         trigger = "The answer (arabic numerals) is"
     elif dataset in ("strategyqa", "coin_flip"):
         trigger = "The answer (Yes or No) is"
     elif dataset in ("bigbench_date"):
-        trigger = "Among A through F, the answer is"
+        trigger = "You should return only ONE CHARACTER. Among A through F, the answer is "
     elif dataset in ("object_tracking"):
-        trigger = "Among A through C, the answer is" 
+        trigger = "You should return only ONE CHARACTER. Among A through C, the answer is " 
     return trigger
 
             
