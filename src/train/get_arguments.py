@@ -72,7 +72,7 @@ class ModelArguments:
         }
     )
     torch_dtype: Optional[str] = field(
-        default=None,
+        default="bfloat16",
         metadata={
             "help": (
                 "Override the default `torch.dtype` and load the model under this dtype. If `auto` is passed, the "
@@ -80,6 +80,7 @@ class ModelArguments:
             ),
             "choices": ["auto", "bfloat16", "float16", "float32"],
         },
+        # choices=["fp32", "float32", "fp16", "float16", "bf16", "bfloat16", "fp64", "float64", "double"],
     )
 
     ### added ####

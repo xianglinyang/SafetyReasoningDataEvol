@@ -2,10 +2,13 @@
 # '''Adapted from https://github.com/princeton-nlp/LESS/tree/main/less/scripts'''
 
 # ---------os env---------
-export CUDA_VISIBLE_DEVICES=1
+# Remove the CUDA_VISIBLE_DEVICES line since we want to use multiple GPUs
+# export CUDA_VISIBLE_DEVICES=1
 
 # ---------base arguments---------
-header="torchrun --nproc_per_node=1 -m src.train.sft"
+ID=$RANDOM
+header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+# header="torchrun --nproc_per_node=1 -m src.train.sft"
 
 base_arguments="\
 --max_seq_length 1024 \
@@ -17,10 +20,28 @@ base_arguments="\
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
 --per_device_train_batch_size 2 \
---gradient_accumulation_steps 32 \
+--gradient_accumulation_steps 16 \
 --optim adamw_torch \
 --num_train_epochs 4 \
 --torch_dtype bfloat16 \
+--bf16 True \
+--tf32 False \
+--fp16 False \
+--overwrite_output_dir True \
+--do_train True \
+--do_eval True \
+--evaluation_strategy steps \
+--eval_steps 100 \
+--save_strategy steps \
+--save_steps 500 \
+--save_total_limit 3 \
+--load_best_model_at_end True \
+--metric_for_best_model loss \
+--greater_is_better False \
+--ddp_find_unused_parameters False \
+--warmup_ratio 0.03 \
+--weight_decay 0.0 \
+--logging_steps 1 \
 "
 
 # ---------dataset arguments---------
