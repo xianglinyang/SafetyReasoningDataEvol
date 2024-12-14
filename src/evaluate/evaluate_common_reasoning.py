@@ -32,7 +32,23 @@ from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleans
 
 logger = logging.getLogger(__name__)
 
-def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
+async def process_single_evaluation(llm, dataset_name, question, answer, idx):
+    trigger = "Solve the following problem:\n\n"
+    llm_answer = llm.invoke(trigger + question)
+    
+    logger.info(f"{idx} Question: {question}")
+    logger.info(f"[GT answer]: {answer}")
+    logger.info(f"[LLM Answer]: {llm_answer}")
+    
+    pred_answer = await answer_cleansing_with_llm(dataset_name, llm_answer)
+    clean_answer = gt_answer_cleansing(dataset_name, answer)
+    
+    logger.info(f"[Pred answer]: {pred_answer}")
+    logger.info(f"[Cleaning]: {clean_answer == pred_answer}")
+    
+    return int(clean_answer == pred_answer)
+
+async def evaluate_reasoning_async(llm, dataset_name, dataset, eval_num=-1):
     t0 = time.time()
 
     if eval_num == -1:
@@ -43,32 +59,37 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
     else:
         eval_idxs = random.sample(range(len(dataset)), eval_num)
 
-    correct = [0]*len(eval_idxs)
-    trigger = zero_shot_answer_trigger(dataset_name)
-
-    for i in tqdm(range(len(eval_idxs))):
-        idx = eval_idxs[i]
+    correct = [0] * len(eval_idxs)
+    
+    # Process evaluations sequentially
+    for i, idx in enumerate(tqdm(eval_idxs)):
         question, _, answer = dataset[idx]
-        llm_answer = llm.invoke(question+" "+trigger)
+        correct[i] = await process_single_evaluation(llm, dataset_name, question, answer, idx)
 
-        logger.info(f"{idx} Question: {question}")
-        logger.info(f"[GT answer]: {answer}")
-        logger.info(f"[LLM Answer]: {llm_answer}")
-        pred_answer = asyncio.run(answer_cleansing_with_llm(dataset_name, llm_answer))
-        answer = gt_answer_cleansing(dataset_name, answer)
-        logger.info(f"[Pred answer]: {pred_answer}")
-        logger.info(f"[Cleaning]: {answer == pred_answer}")
-        correct[i] = int(answer == pred_answer)
+    return correct, time.time() - t0
 
-    t1 = time.time()
-
-    time_spent = (t1-t0)/60
-    accu = sum(correct)/eval_num
-    print("*"*50)
-    logger.info(f'Evaluate num:{eval_num}')
-    logger.info(f"Accuracy: {accu} = {sum(correct)}/{eval_num}")
-    logger.info(f"Time spent: {time_spent:.2f} minutes")
-    return accu, correct, eval_idxs
+def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
+    # For Jupyter notebooks
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except ImportError:
+        pass
+    
+    # Create and run the event loop
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    try:
+        correct, elapsed_time = loop.run_until_complete(
+            evaluate_reasoning_async(llm, dataset_name, dataset, eval_num)
+        )
+        return correct, elapsed_time
+    finally:
+        # Don't close the loop here
+        pass
 
 
 def save_results(results: Dict, path="eval_results"):
@@ -117,8 +138,6 @@ def save_results(results: Dict, path="eval_results"):
 
 
 def main():
-    
-    
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name_or_path", type=str)
     parser.add_argument("--dataset_name", type=str, default="gsm8k")
@@ -153,7 +172,7 @@ def main():
 
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
-    accu, correct, eval_idxs = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
+    accu, elapsed_time = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
 
     results = {
         "accu": accu,
