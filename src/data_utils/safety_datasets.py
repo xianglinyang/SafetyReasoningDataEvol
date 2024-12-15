@@ -37,14 +37,15 @@ class SafetyReasoningDataset(Dataset):
         messages.append({"role": "user", "content": question})
         messages.append({"role": "assistant", "content": answer})
 
+        # encode the messages
+        formatted_text = self.tokenizer.apply_chat_template(messages, tokenize=False)
+
         # Tokenize with explicit padding and truncation
-        encodings = self.tokenizer.apply_chat_template(messages,
-                                                  max_length=self.max_length,
-                                                  padding='max_length',
-                                                  truncation=True,
-                                                  return_tensors="pt",
-                                                  return_attention_mask=True,
-                                                  return_dict=True)
+        encodings = self.tokenizer(formatted_text, 
+                                   return_tensors='pt', 
+                                   max_length=self.max_length, 
+                                   padding='max_length',
+                                   truncation=True)
         
         # Create the model inputs
         model_inputs = {
@@ -55,27 +56,16 @@ class SafetyReasoningDataset(Dataset):
         labels = encodings['input_ids'][0].clone()
 
         # assistant_tokens_mask
-        encodings_wo_assistant = self.tokenizer.apply_chat_template(messages[:-1],
-                                                  max_length=self.max_length,
-                                                  padding='max_length',
-                                                  truncation=True,
-                                                  return_tensors="pt",
-                                                  return_attention_mask=True,
-                                                  return_dict=True)
+        formatted_text_wo_assistant = self.tokenizer.apply_chat_template(messages[:-1], tokenize=False)
+        encodings_wo_assistant = self.tokenizer(formatted_text_wo_assistant, 
+                                                return_tensors='pt', 
+                                                padding=False)
 
         # mask the prompt part for avoiding loss
         labels[:encodings_wo_assistant.input_ids.shape[1]] = -100    
     
         model_inputs['labels'] = labels
         return model_inputs
-    
-    def _find_subsequence(self, seq: List[int], subseq: List[int]) -> int:
-        """Find the starting position of a subsequence in a sequence."""
-        n, m = len(seq), len(subseq)
-        for i in range(n - m + 1):
-            if seq[i:i+m] == subseq:
-                return i
-        return None
     
 
     def _load_data(self, dataset_name, split):
