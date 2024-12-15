@@ -7,7 +7,7 @@ Harmful datasets:
 4. advbench
 5. Malicious Instruct
 '''
-
+import json
 from datasets import load_dataset
 from torch.utils.data import Dataset
 __datasets__ = [
@@ -15,7 +15,8 @@ __datasets__ = [
     "harmbench",
     "sorrybench",
     "advbench",
-    "Malicious Instruct"
+    "Malicious Instruct",
+    "circuitbreaker"
 ]
 
 sorrybench_categories = [
@@ -133,6 +134,16 @@ def data_reader(dataset_name, split):
         
         for item in data:
             prompt = item['prompt']
+            questions.append(prompt)
+    
+    elif dataset_name == "circuitbreaker":
+        assert split in ["train", "val"], f"{dataset_name} does not have {split} splits."
+        data_path = f"data/raw/{dataset_name}_{split}.json"
+        with open(data_path, 'r') as f:
+            data = json.load(f)
+        
+        for item in data:
+            prompt = item["prompt"]
             questions.append(prompt)
 
     return questions, categories
