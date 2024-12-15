@@ -1,8 +1,8 @@
 '''
 This file is used to evaluate the adversarial attack on the reasoning dataset.
 1. None
-2. Manual
-3. AutoDAN
+2. Manual jailbreak
+3. AutoDAN 
 4. TAP-T
 5. PAIR
 6. GCG
@@ -23,5 +23,4 @@ __adv_attacks__ = [
     "Input Embed",
     "RepE Attack"
 ]
-
-# TODO: add the attack methods
+# https://autodans.github.io/AutoDAN-Turbo/
