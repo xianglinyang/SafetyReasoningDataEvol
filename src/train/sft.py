@@ -3,11 +3,8 @@ The training script for the Safety Reasoning Data Evol model with LoRA.
 '''
 
 import os
-import sys
-import time
 import logging
 import torch.distributed as dist
-from transformers.trainer_utils import get_last_checkpoint
 import torch
 
 from transformers import (
@@ -23,17 +20,19 @@ from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 from src.train.get_arguments import ModelArguments, DataArguments, TrainingArguments
 from src.data_utils.safety_datasets import SafetyReasoningDataset
 from src.logger.config import setup_logging
+from src.logger.train_log import LoggingCallback
 from src.utils.dtype_utils import str2dtype
+
 
 logger = logging.getLogger(__name__)
 
 def main():
-    # Setup logging
-    setup_logging(task_name="train")
-
     # Parse arguments
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+
+    # Setup logging
+    setup_logging(task_name="train", run_id=training_args.run_id)
 
     # log arguments
     logger.info(f"Training parameters {training_args}")
@@ -42,7 +41,6 @@ def main():
     
     # Set seed for reproducibility
     set_seed(training_args.seed)
-
     # for distributed training
     if model_args.device_map == "cuda" and torch.cuda.is_available():
         torch.backends.cuda.matmul.allow_tf32 = True
@@ -54,32 +52,14 @@ def main():
         use_fast=model_args.use_fast_tokenizer,
         padding_side="right"
     )
-
-    # Set seed before initializing model.
-    set_seed(training_args.seed)
-
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
+
+    # Load model. Apply LoRA if needed
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path, 
         torch_dtype=str2dtype(model_args.torch_dtype),
         device_map=model_args.device_map
-    )
-
-    # Load training dataset
-    train_dataset = SafetyReasoningDataset(
-        dataset_name=data_args.dataset_name,
-        split="train",
-        tokenizer=tokenizer,
-        max_length=data_args.max_seq_length,
-        # system_inst=data_args.system_inst
-        )
-    val_dataset = SafetyReasoningDataset(
-        dataset_name=data_args.dataset_name,
-        split="val",
-        tokenizer=tokenizer,
-        max_length=data_args.max_seq_length
     )
 
     # resize embeddings if needed (e.g. for LlamaTokenizer)
@@ -114,9 +94,23 @@ def main():
                 output.requires_grad_(True)
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
-
     model_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info(f"trainable model_params: {model_params}")
+
+    # Load datasets for training and validation
+    train_dataset = SafetyReasoningDataset(
+        dataset_name=data_args.dataset_name,
+        split="train",
+        tokenizer=tokenizer,
+        max_length=data_args.max_seq_length,
+        # system_inst=data_args.system_inst
+    )
+    val_dataset = SafetyReasoningDataset(
+        dataset_name=data_args.dataset_name,
+        split="val",
+        tokenizer=tokenizer,
+        max_length=data_args.max_seq_length
+    )
 
     trainer = Trainer(
         model=model,
@@ -128,7 +122,8 @@ def main():
             tokenizer=tokenizer,
             padding=True,
             pad_to_multiple_of=8
-        )
+        ),
+        callbacks=[LoggingCallback()]
     )
     
     # Training

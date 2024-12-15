@@ -188,6 +188,12 @@ class TrainingArguments(TrainingArguments):
             "help": "Whether to drop the last incomplete batch in the dataloader."
         },
     )
+    run_id: Optional[int] = field(
+        default=None,
+        metadata={
+            "help": "The run id for the training."
+        },
+    )
 
     def __post_init__(self):
         # Set logging_dir if not provided
