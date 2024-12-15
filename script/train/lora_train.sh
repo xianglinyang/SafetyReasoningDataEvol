@@ -10,7 +10,7 @@ ID=$RANDOM
 header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
---max_seq_length 2048 \
+--max_seq_length 1024 \
 --lora True \
 --lora_r 128 \
 --lora_alpha 512 \
@@ -47,6 +47,7 @@ base_arguments="\
 dataset_names=("circuitbreaker")
 model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.1")
 model_name_abbrs=("llama2-7b" "llama3-8b" "mistral-7b")
+
 out_dir="outputs"
 
 # Loop through each dataset
@@ -54,7 +55,8 @@ for dataset_name in ${dataset_names[@]}; do
     # loop through each model
     for i in "${!model_name_or_paths[@]}"; do
 
-        output_dir="${out_dir}/${dataset_name}/${model_name_abbrs[$i]}"
+        # output dir format with model name+date
+        output_dir="${out_dir}/${dataset_name}/${model_name_abbrs[$i]}_$(date +%Y%m%d)"
         if [[ ! -d $output_dir ]]; then
             mkdir -p $output_dir
         fi

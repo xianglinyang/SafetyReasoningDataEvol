@@ -13,7 +13,7 @@ from transformers import (
     HfArgumentParser,
     set_seed,
     Trainer,
-    DataCollatorWithPadding
+    DataCollatorForSeq2Seq
 )
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
@@ -118,11 +118,8 @@ def main():
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         tokenizer=tokenizer,
-        data_collator=DataCollatorWithPadding(
-            tokenizer=tokenizer,
-            padding=True,
-            pad_to_multiple_of=8
-        ),
+        data_collator=DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, model=model, padding="longest"),
         callbacks=[LoggingCallback()]
     )
     
