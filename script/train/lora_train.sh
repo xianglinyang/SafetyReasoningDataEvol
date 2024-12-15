@@ -8,10 +8,9 @@
 # ---------base arguments---------
 ID=$RANDOM
 header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
-# header="torchrun --nproc_per_node=1 -m src.train.sft"
 
 base_arguments="\
---max_seq_length 1024 \
+--max_seq_length 2048 \
 --lora True \
 --lora_r 128 \
 --lora_alpha 512 \
@@ -60,12 +59,15 @@ for dataset_name in ${dataset_names[@]}; do
             mkdir -p $output_dir
         fi
 
+        # for the same command, the log file name is the same
+        run_id=$RANDOM
+
         full_command="$header $base_arguments \
         --dataset_name $dataset_name \
         --output_dir $output_dir \
-        --model_name_or_path ${model_name_or_paths[$i]}"
+        --model_name_or_path ${model_name_or_paths[$i]} \
+        --run_id $run_id"
 
-        echo "Training model: ${model_name_or_paths[$i]}"
         echo "$full_command"
         eval $full_command
     done
