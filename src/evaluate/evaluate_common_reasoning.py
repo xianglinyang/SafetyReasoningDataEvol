@@ -14,6 +14,7 @@ alpaca
 '''
 
 import os
+import sys
 import json
 import time
 import random
@@ -69,12 +70,12 @@ async def evaluate_reasoning_async(llm, dataset_name, dataset, eval_num=-1):
     return correct, time.time() - t0
 
 def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
-    # For Jupyter notebooks
-    try:
-        import nest_asyncio
-        nest_asyncio.apply()
-    except ImportError:
-        pass
+    # # For Jupyter notebooks
+    # try:
+    #     import nest_asyncio
+    #     nest_asyncio.apply()
+    # except ImportError:
+    #     pass
     
     # Create and run the event loop
     loop = asyncio.get_event_loop()
@@ -86,11 +87,9 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
         correct, elapsed_time = loop.run_until_complete(
             evaluate_reasoning_async(llm, dataset_name, dataset, eval_num)
         )
-        return correct, elapsed_time
+        return sum(correct) / len(correct), elapsed_time
     finally:
-        # Don't close the loop here
         pass
-
 
 def save_results(results: Dict, path="eval_results"):
     if not os.path.exists(path):
@@ -128,7 +127,9 @@ def save_results(results: Dict, path="eval_results"):
                     
                 finally:
                     # Release the lock
+                    print("Releasing lock...")
                     fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+                    print("Lock released")
                     
         except Exception as e:
             if attempt == max_retries - 1:
@@ -182,7 +183,8 @@ def main():
         "eval_num": eval_num
     }
     logger.info(f"Evaluation results: {results}")
-    save_results(results)
+    # save_results(results)
+    print("End of evaluation")
 
 
 if __name__ == "__main__":
