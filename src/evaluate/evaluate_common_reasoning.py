@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import time
+import datetime
 import random
 from tqdm import tqdm
 import logging
@@ -180,7 +181,8 @@ def main():
         "dataset_name": dataset_name,
         "model_name_or_path": model_name_or_path,
         "split": split,
-        "eval_num": eval_num
+        "eval_num": eval_num,
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     logger.info(f"Evaluation results: {results}")
     # save_results(results)
