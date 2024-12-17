@@ -20,6 +20,12 @@ class DataArguments:
             "help": "The maximum total input sequence length after tokenization."
         }
     )
+    ratio: Optional[float] = field(
+        default=0.5,
+        metadata={
+            "help": "The ratio of the dataset of harmful and helpful to use"
+        }
+    )
 
 @dataclass
 class ModelArguments:

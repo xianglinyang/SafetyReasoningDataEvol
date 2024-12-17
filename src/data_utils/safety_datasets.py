@@ -1,4 +1,5 @@
 import json
+import random
 from typing import Dict, List
 
 import torch
@@ -13,13 +14,56 @@ class SafetyReasoningDataset(Dataset):
                 split: str,             # train/val/test
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
+                ratio: float = 0.5,
                 system_inst=None
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.dataset = self._load_data(dataset_name, split)
+        self.ratio = ratio
         self.system_inst = system_inst
+        self._load_data(dataset_name, split)
+    
+
+    def _load_data(self, dataset_name, split):
+        # circuitbreaker original data+ processed data
+        data_path = f"data/processed/{dataset_name}_{split}.json"
+        with open(data_path, 'r') as f:
+            circuitbreaker = json.load(f)
+        # dolly dataset
+        data_path = f"data/processed/dolly.json"
+        with open(data_path, 'r') as f:
+            dolly = json.load(f)
+        
+        self.dataset = list()
+        # original data
+        for data in circuitbreaker:
+            evolved_question = data['evolved_question']
+            evolved_answer = data['evolved_answer']
+            self.dataset.append({
+                "question": evolved_question,
+                "answer": evolved_answer
+            })
+        for data in circuitbreaker:
+            question = data['question']
+            evolved_answer = data['evolved_answer']
+            self.dataset.append({
+                "question": question,
+                "answer": evolved_answer
+            })
+        # load dolly dataset
+        num = int(len(self.dataset) / self.ratio - len(self.dataset))
+        dolly = random.sample(dolly, num)
+        for data in dolly:
+            question = data['evolved_question']
+            answer = data['evolved_answer']
+            self.dataset.append({
+                "question": question,
+                "answer": answer
+            })
+        
+        # shuffle the dataset
+        random.shuffle(self.dataset)
 
     def __len__(self):
         return len(self.dataset)
@@ -27,8 +71,8 @@ class SafetyReasoningDataset(Dataset):
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         example = self.dataset[i]
         
-        question = example['evolved_question']
-        answer = example['evolved_answer']
+        question = example['question']
+        answer = example['answer']
 
         # format data
         messages = list()
@@ -68,8 +112,4 @@ class SafetyReasoningDataset(Dataset):
         return model_inputs
     
 
-    def _load_data(self, dataset_name, split):
-        # Implement your data loading logic here
-        data_path = f"data/processed/{dataset_name}_{split}.json"
-        with open(data_path, 'r') as f:
-            return json.load(f)
+    

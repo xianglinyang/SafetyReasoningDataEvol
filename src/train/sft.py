@@ -102,6 +102,7 @@ def main():
         dataset_name=data_args.dataset_name,
         split="train",
         tokenizer=tokenizer,
+        ratio=data_args.ratio,
         max_length=data_args.max_seq_length,
         # system_inst=data_args.system_inst
     )
@@ -109,7 +110,9 @@ def main():
         dataset_name=data_args.dataset_name,
         split="val",
         tokenizer=tokenizer,
-        max_length=data_args.max_seq_length
+        max_length=data_args.max_seq_length,
+        ratio=data_args.ratio,
+        # system_inst=data_args.system_inst
     )
 
     trainer = Trainer(
