@@ -16,6 +16,7 @@ import requests
 import random
 import logging
 import argparse
+from datasets import load_dataset
 
 from src.evol.questions import QuestionStrategy
 from src.evol.answers import AnswerStrategy
@@ -36,55 +37,53 @@ class DataEvolver:
         self.answer_strategy = AnswerStrategy()
 
         # load the strategies that are supported by both question and answer strategies
-        self._strategies = list(set(self.question_strategy._strategies) & set(self.answer_strategy._strategies))
+        self._strategies = self.question_strategy._strategies
         logger.info(f"Strategies: {self._strategies}")
+        self.question_templates = self._load_question_templates()
 
-        self.templates = self._load_templates()
-
-    def _load_templates(self):
-        self.templates = {}
+    def _load_question_templates(self):
+        self.question_templates = {}
         for strategy in self._strategies:
-            question_templates = self.question_strategy.templates[strategy]
-            answer_templates = self.answer_strategy.templates[strategy]
-            min_len = min(len(question_templates), len(answer_templates))
-            question_templates = random.sample(question_templates, min_len)
-            answer_templates = random.sample(answer_templates, min_len)
-            # zip the question and answer templates
-            self.templates[strategy] = list(zip(question_templates, answer_templates))
-        return self.templates
-    
+            self.question_templates[strategy] = self.question_strategy.templates[strategy]
+        return self.question_templates
+
     def sample_strategy(self):
         strategy = random.choice(self._strategies)
         return strategy
     
-    def evol_single_data(self, question: str, question_category="harmful and toxic content"):
-        strategy = self.sample_strategy()
-        question_template, answer_template = random.choice(self.templates[strategy])
+    def evol_data(self, question_template, answer_template, question: str, question_category: str, answer_output: str):
         question_instance = question_template.format(question=question)
-        answer_instance = answer_template.format(question=question, question_category=question_category)
+        answer_instance = answer_template.format(category=question_category, output=answer_output)
         return question_instance, answer_instance
     
-    def evol_data(self, question_template, answer_template, question: str, question_category: str):
-        question_instance = question_template.format(question=question)
-        answer_instance = answer_template.format(question=question, category=question_category)
-        return question_instance, answer_instance
-    
-    def evol_dataset(self, dataset: list) -> list:
-        """Evolve an entire dataset of question-answer pairs"""
-        all_qa_pairs = list()
+    def generate_templates(self, answer_output="refusal"):
+        # load the question templates
+        question_templates = list()
         for strategy in self._strategies:
-            all_qa_pairs.extend(self.templates[strategy])
-        if len(all_qa_pairs) < len(dataset):
-            logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(all_qa_pairs)} templates are available.")
+            question_templates.extend(self.question_templates[strategy])
+        # load the answer template
+        if answer_output == "refusal":
+            answer_template = self.answer_strategy.refusal_format
+        elif answer_output == "normal":
+            answer_template = self.answer_strategy.normal_format
+        else:
+            logger.error(f"Invalid output type: {answer_output}")
+            return None, None
+        return question_templates, answer_template
+  
+    def evol_dataset(self, dataset: list, output="refusal") -> list:
+        """Evolve an entire dataset of question-answer pairs"""
+        question_templates, answer_template = self.generate_templates(output)
+        if len(question_templates) < len(dataset):
+            logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(question_templates)} templates are available.")
             return []
-        
-        # shuffle the pairs
-        random.shuffle(all_qa_pairs)
+        # shuffle the questions
+        random.shuffle(question_templates)
 
         evolved_dataset = list()
-        for (question, question_category), (question_template, answer_template) in zip(dataset, all_qa_pairs):
+        for (question, question_category, output), question_template in zip(dataset, question_templates):
             if question_category is None:
-                question_category = "harmful and toxic content"
+                question_category = "unsafe content"
             question_instance, answer_instance = self.evol_data(question_template, answer_template, question, question_category)
             evolved_dataset.append({
                 "evolved_question": question_instance.strip(),
@@ -141,20 +140,26 @@ def process_circuitbreaker_dataset(train):
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
         dataset = json.load(f)
-
-    question_category_pairs = [(dataset[i]['prompt'], dataset[i]['category'] if 'category' in dataset[i] else None) for i in range(len(dataset))]
-
     data_evolver = DataEvolver()
-    evolved_dataset = data_evolver.evol_dataset(question_category_pairs)
+
+    question_templates, answer_template = data_evolver.generate_templates(answer_output="refusal")
+    if len(question_templates) < len(dataset):
+        logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(question_templates)} templates are available.")
+        return
+    else:
+        random.shuffle(question_templates)
+        question_templates = question_templates[:len(dataset)]
 
     # merge the original dataset and the evolved dataset
     merged_dataset = []
     for i in range(len(dataset)):
+        question_template = question_templates[i]
         question = dataset[i]['prompt']
-        question_category = "harmful and toxic content" if 'category' not in dataset[i] else dataset[i]['category']
+        question_category = "unsafe content" if 'category' not in dataset[i] else dataset[i]['category']
         refusal_answer = dataset[i]['llama3_output']
         output = dataset[i]['output']
-        evolved_question, evolved_answer = evolved_dataset[i]['evolved_question'], evolved_dataset[i]['evolved_answer']
+        evolved_question = question_template.format(question=question)
+        evolved_answer = answer_template.format(category=question_category, output=refusal_answer)
         
         merged_dataset.append({
             "category": question_category,
@@ -168,23 +173,62 @@ def process_circuitbreaker_dataset(train):
     dump_json(merged_dataset, processed_file_path)
     logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
+
+def process_dolly():
+    logger.info(f"Processing dolly dataset...")
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
+
+    # dataset keys: category, prompt, llama3_output
+    dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
+    
+    data_evolver = DataEvolver()
+    _, answer_template = data_evolver.generate_templates(answer_output="normal")
+
+    evolved_dataset = []
+    for data in dataset:
+        context = data['context']
+        instruction = data['instruction']
+        category = data['category']
+        response = data['response']
+        
+        question = context + instruction
+        evolved_answer = answer_template.format(category=category, output=response)
+        evolved_dataset.append({
+            "category": category,
+            "answer": response,
+            "evolved_question": question,
+            "evolved_answer": evolved_answer
+        })
+
+    dump_json(evolved_dataset, processed_file_path)
+    logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
+
+#TODO
+# open instruction dataset
+# open assistant dataset
+# cot dataset
+# flan v2 dataset
+
 #-------------------------Main-------------------------
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--run_id", '-r', type=int)
-    args = parser.parse_args()
-    run_id = args.run_id
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--run_id", '-r', type=int)
+    # args = parser.parse_args()
+    # run_id = args.run_id
 
-    setup_logging(task_name="data_evol", run_id=run_id)
-    logger.info("Assembling data...")
+    # setup_logging(task_name="data_evol", run_id=run_id)
+    # logger.info("Assembling data...")
 
-    logger.info("Downloading circuitbreaker dataset...")
-    download_circuitbreaker_dataset(train=True)
-    download_circuitbreaker_dataset(train=False)
+    # logger.info("Downloading circuitbreaker dataset...")
+    # download_circuitbreaker_dataset(train=True)
+    # download_circuitbreaker_dataset(train=False)
 
-    logger.info("Processing circuitbreaker dataset...")
+    # logger.info("Processing circuitbreaker dataset...")
     process_circuitbreaker_dataset(train=True) 
     process_circuitbreaker_dataset(train=False) 
+
+    # logger.info("Processing dolly dataset...")
+    process_dolly()
 
 
 if __name__ == "__main__":
