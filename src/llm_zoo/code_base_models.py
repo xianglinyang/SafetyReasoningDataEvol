@@ -19,11 +19,14 @@ Qwen/Qwen2.5-7B-Instruct
 
 import os
 import torch
+import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel, LoraConfig
 
 from src.llm_zoo.base_model import BaseLLM
-from src.llm_zoo.model_configs import MODEL_CONFIGS
+from src.llm_zoo.model_configs import get_system_prompt
+
+logger = logging.getLogger(__name__)
 
 class HuggingFaceLLM(BaseLLM):
     def __init__(self, model_name_or_path="meta-llama/Llama-2-7b-chat-hf", torch_dtype=torch.bfloat16, device="cuda"):
@@ -31,6 +34,7 @@ class HuggingFaceLLM(BaseLLM):
         self.model_name_or_path=model_name_or_path
         self.torch_dtype=torch_dtype
         self.device=device
+        self.system_prompt = get_system_prompt(model_name_or_path)
         self._load_tokenizer(model_name_or_path)
         self._load_model(model_name_or_path, device, torch_dtype)
 
@@ -39,9 +43,10 @@ class HuggingFaceLLM(BaseLLM):
         if self.tokenizer.pad_token is None:
             self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
 
-    def _load_model(self, model_name_or_path, device, torch_dtype):
+    def _load_model(self, model_name_or_path, torch_dtype):
         is_peft = os.path.exists(os.path.join(model_name_or_path, "adapter_config.json"))
         if is_peft:
+            logger.info("Loading LoRA model from {}".format(model_name_or_path))
             # load this way to make sure that optimizer states match the model structure
             config = LoraConfig.from_pretrained(model_name_or_path)
             base_model = AutoModelForCausalLM.from_pretrained(
@@ -49,23 +54,20 @@ class HuggingFaceLLM(BaseLLM):
             self.model = PeftModel.from_pretrained(
                 base_model, model_name_or_path, device_map=self.device, ignore_mismatched_sizes=True)
         else:
+            logger.info(f"Loading base model from {model_name_or_path}")
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name_or_path, torch_dtype=torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
 
-        # resize embeddings if needed (e.g. for LlamaTokenizer)
-        embedding_size = self.model.get_input_embeddings().weight.shape[0]
-        if len(self.tokenizer) > embedding_size:
-            self.model.resize_token_embeddings(len(self.tokenizer))
     
-    def prompt2messages(self, prompt, system=None):
+    def prompt2messages(self, prompt):
         messages = list()
-        if system is not None:
-            messages.append({"role": "system", "content": system})
+        if self.system_prompt is not None:
+            messages.append({"role": "system", "content": self.system_prompt})
         messages.append({"role": "user", "content": prompt})
         return messages
 
-    def invoke(self, prompt, max_new_tokens=2048, temperature=0.1, system=None, verbose=False):
-        messages = self.prompt2messages(prompt, system)
+    def invoke(self, prompt, max_new_tokens=2048, temperature=0.1, verbose=False):
+        messages = self.prompt2messages(prompt)
         prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
         
         # 3: Tokenize the chat (This can be combined with the previous step using tokenize=True)

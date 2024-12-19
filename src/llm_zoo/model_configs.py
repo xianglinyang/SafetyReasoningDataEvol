@@ -1,5 +1,9 @@
 '''Model-specific templates'''
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Llama 2 chat templates are based on
 # - https://github.com/centerforaisafety/HarmBench/blob/main/baselines/model_utils.py
 LLAMA2_DEFAULT_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
@@ -32,4 +36,5 @@ def get_system_prompt(model_name_or_path):
     elif "mistral" in model_name_or_path.lower():
         return MISTRAL_DEFAULT_SYSTEM_PROMPT
     else:
-        raise ValueError(f"Unsupported model: {model_name_or_path}")
+        logger.info(f"No system prompt found for model: {model_name_or_path}")
+        return None
