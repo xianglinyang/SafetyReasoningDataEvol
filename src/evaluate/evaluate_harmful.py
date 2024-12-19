@@ -22,13 +22,14 @@ import argparse
 import logging
 import fcntl
 import asyncio
+from datetime import datetime
 
 from src.logger.config import setup_logging
 from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.llm_zoo.api_base_models import OpenAILLM
 from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
-from src.evaluate.adv_attack import __adv_attacks__
+# from src.evaluate.adv_attack import __adv_attacks__
 
 logger = logging.getLogger(__name__)
 ##############################################################################################
@@ -416,7 +417,8 @@ def main():
         "eval_num": eval_num,
         "split": split,
         "attack_type": "prompt" if attack_name in __prompt_attacks_methods__ else "adv",
-        "evaluation": evaluation
+        "evaluation": evaluation,
+        "evaluation_date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     logger.info(f"Evaluation results: {results}")
 
