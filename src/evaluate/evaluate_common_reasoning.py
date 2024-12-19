@@ -17,7 +17,7 @@ import os
 import sys
 import json
 import time
-import datetime
+from datetime import datetime
 import random
 from tqdm import tqdm
 import logging
@@ -42,7 +42,7 @@ async def process_single_evaluation(llm, dataset_name, question, answer, idx):
     logger.info(f"[GT answer]: {answer}")
     logger.info(f"[LLM Answer]: {llm_answer}")
     
-    pred_answer = await answer_cleansing_with_llm(dataset_name, llm_answer)
+    pred_answer = await answer_cleansing_with_llm(dataset_name, question+"\n\n"+llm_answer)
     clean_answer = gt_answer_cleansing(dataset_name, answer)
     
     logger.info(f"[Pred answer]: {pred_answer}")
