@@ -2,16 +2,8 @@
 
 # Llama 2 chat templates are based on
 # - https://github.com/centerforaisafety/HarmBench/blob/main/baselines/model_utils.py
-LLAMA2_DEFAULT_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
-If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
-LLAMA2_BEGIN_OF_TEXT = "<s>"
-LLAMA2_END_OF_TEXT = "</s>"
-LLAMA2_CHAT_TEMPLATE = "[INST] {instruction} [/INST] "
-LLAMA2_CHAT_TEMPLATE_WITH_SYSTEM = "[INST] <<SYS>>\n{}\n<</SYS>>\n\n{instruction} [/INST] "
-LLAMA2_USER_TAG = "[INST]"
-LLAMA2_ASSISTANT_TAG = "[/INST]"
-LLAMA2_SEP_TOKEN = " "
-LLAMA2_SYSTEM = "<<SYS>>\n{}\n<</SYS>>\n\n".format(LLAMA2_DEFAULT_SYSTEM_PROMPT)
+LLAMA2_DEFAULT_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
+
 
 # Llama 3 chat templates are based on
 # - https://llama.meta.com/docs/model-cards-and-prompt-formats/meta-llama-3/
@@ -25,8 +17,7 @@ LLAMA3_SEP_TOKEN = ""
 
 # Mistral chat templates are based on
 # - https://github.com/mistralai/mistralai/blob/main/mistralai/chat.py
-MISTRAL_DEFAULT_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature.
-If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
+MISTRAL_DEFAULT_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
 MISTRAL_BEGIN_OF_TEXT = "<s>"
 MISTRAL_END_OF_TEXT = "</s>"
 MISTRAL_SYSTEM_TAG = "[INST]"
@@ -35,24 +26,10 @@ MISTRAL_USER_TAG="[INST]"
 MISTRAL_ASSISTANT_TAG="[/INST]"
 MISTRAL_SEP_TOKEN = " "
 
-# TODO Add more models
-MODEL_CONFIGS = {
-    "llama2": {
-        "user_tag": LLAMA2_USER_TAG,
-        "assistant_tag": LLAMA2_ASSISTANT_TAG,
-        "system": LLAMA2_SYSTEM,
-        "sep_token": LLAMA2_SEP_TOKEN,
-    },
-    "llama3": {
-        "user_tag": LLAMA3_USER_TAG,
-        "assistant_tag": LLAMA3_ASSISTANT_TAG,
-        "system": LLAMA3_SYSTEM,
-        "sep_token": LLAMA3_SEP_TOKEN,
-    },
-    "mistral": {
-        "user_tag": MISTRAL_USER_TAG,
-        "assistant_tag": MISTRAL_ASSISTANT_TAG,
-        "system": MISTRAL_SYSTEM,
-        "sep_token": MISTRAL_SEP_TOKEN,
-    },
-}
+def get_system_prompt(model_name_or_path):
+    if "llama" in model_name_or_path.lower():
+        return LLAMA2_DEFAULT_SYSTEM_PROMPT
+    elif "mistral" in model_name_or_path.lower():
+        return MISTRAL_DEFAULT_SYSTEM_PROMPT
+    else:
+        raise ValueError(f"Unsupported model: {model_name_or_path}")

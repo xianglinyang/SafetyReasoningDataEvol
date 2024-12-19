@@ -8,20 +8,18 @@ import torch.distributed as dist
 import torch
 
 from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
     HfArgumentParser,
     set_seed,
     Trainer,
     DataCollatorForSeq2Seq
 )
-from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
 from src.train.get_arguments import ModelArguments, DataArguments, TrainingArguments
 from src.data_utils.safety_datasets import SafetyReasoningDataset
 from src.logger.config import setup_logging
 from src.logger.train_log import LoggingCallback
-from src.utils.dtype_utils import str2dtype
+from src.utils.train_utils import load_tokenizer_and_model, save_tokenizer_and_model
+from src.llm_zoo.model_configs import get_system_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -46,56 +44,7 @@ def main():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
     
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path,
-        use_fast=model_args.use_fast_tokenizer,
-        padding_side="right"
-    )
-    if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({"pad_token": "<pad>"})
-
-    # Load model. Apply LoRA if needed
-    model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path, 
-        torch_dtype=str2dtype(model_args.torch_dtype),
-        device_map=model_args.device_map
-    )
-
-    # resize embeddings if needed (e.g. for LlamaTokenizer)
-    embedding_size = model.get_input_embeddings().weight.shape[0]
-    if len(tokenizer) > embedding_size:
-        model.resize_token_embeddings(len(tokenizer))
-        # if you load lora model and resize the token embeddings, the requires_grad flag is set to True for embeddings
-        if isinstance(model, PeftModel):
-            model.get_input_embeddings().weight.requires_grad = False
-            model.get_output_embeddings().weight.requires_grad = False
-
-    if not isinstance(model, PeftModel) and model_args.lora:
-        lora_config = LoraConfig(
-            task_type=TaskType.CAUSAL_LM,
-            inference_mode=False,
-            r=model_args.lora_r,
-            lora_alpha=model_args.lora_alpha,
-            lora_dropout=model_args.lora_dropout,
-            target_modules=model_args.lora_target_modules,
-        )
-        model = get_peft_model(model, lora_config)
-        logger.info(
-            f"Applied LoRA to model."
-        )
-        model.print_trainable_parameters()
-
-        # for checkpointing
-        if hasattr(model, "enable_input_require_grads"):
-            model.enable_input_require_grads()
-        else:
-            def make_inputs_require_grad(module, input, output):
-                output.requires_grad_(True)
-            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
-
-    model_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    logger.info(f"trainable model_params: {model_params}")
+    tokenizer, model = load_tokenizer_and_model(model_args)
 
     # Load datasets for training and validation
     train_dataset = SafetyReasoningDataset(
@@ -104,7 +53,7 @@ def main():
         tokenizer=tokenizer,
         ratio=data_args.ratio,
         max_length=data_args.max_seq_length,
-        # system_inst=data_args.system_inst
+        system_inst=get_system_prompt(model_args.model_name_or_path)
     )
     val_dataset = SafetyReasoningDataset(
         dataset_name=data_args.dataset_name,
@@ -112,7 +61,7 @@ def main():
         tokenizer=tokenizer,
         max_length=data_args.max_seq_length,
         ratio=data_args.ratio,
-        # system_inst=data_args.system_inst
+        system_inst=get_system_prompt(model_args.model_name_or_path)
     )
 
     trainer = Trainer(
@@ -129,21 +78,13 @@ def main():
     # Training
     logger.info("*** Starting training ***")
     train_result = trainer.train()
-    
-    # Save final model
-    logger.info("*** Saving final model ***")
-    trainer.save_model(training_args.output_dir)
-    
-    # Save training metrics
-    metrics = train_result.metrics
-    trainer.log_metrics("train", metrics)
-    trainer.save_metrics("train", metrics)
-    
-    # Save trainer state
-    trainer.save_state()
-    
-    # Reload and save tokenizer with added tokens
-    tokenizer.save_pretrained(training_args.output_dir)
+
+    # save to output_dir
+    save_tokenizer_and_model(model, tokenizer, training_args)
+
+    # Cleanup distributed training
+    if dist.is_initialized():
+        dist.destroy_process_group()
 
 if __name__ == "__main__":
     # TODO: remove wandb
