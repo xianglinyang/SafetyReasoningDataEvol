@@ -20,6 +20,7 @@ Qwen/Qwen2.5-7B-Instruct
 import os
 import torch
 import logging
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel, LoraConfig
 
@@ -35,30 +36,31 @@ class HuggingFaceLLM(BaseLLM):
         self.torch_dtype=torch_dtype
         self.device=device
         self.system_prompt = get_system_prompt(model_name_or_path)
-        self._load_tokenizer(model_name_or_path)
-        self._load_model(model_name_or_path, device, torch_dtype)
+        self._load_tokenizer()
+        self._load_model()
 
-    def _load_tokenizer(self, model_name_or_path):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    def _load_tokenizer(self):
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path)
         if self.tokenizer.pad_token is None:
             self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        # Set padding side to left for decoder-only models
+        self.tokenizer.padding_side = "left"
 
-    def _load_model(self, model_name_or_path, torch_dtype):
-        is_peft = os.path.exists(os.path.join(model_name_or_path, "adapter_config.json"))
+    def _load_model(self):
+        is_peft = os.path.exists(os.path.join(self.model_name_or_path, "adapter_config.json"))
         if is_peft:
-            logger.info("Loading LoRA model from {}".format(model_name_or_path))
+            logger.info("Loading LoRA model from {}".format(self.model_name_or_path))
             # load this way to make sure that optimizer states match the model structure
-            config = LoraConfig.from_pretrained(model_name_or_path)
+            config = LoraConfig.from_pretrained(self.model_name_or_path)
             base_model = AutoModelForCausalLM.from_pretrained(
-                config.base_model_name_or_path, torch_dtype=torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
+                config.base_model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
             self.model = PeftModel.from_pretrained(
-                base_model, model_name_or_path, device_map=self.device, ignore_mismatched_sizes=True)
+                base_model, self.model_name_or_path, device_map=self.device, ignore_mismatched_sizes=True)
         else:
-            logger.info(f"Loading base model from {model_name_or_path}")
+            logger.info(f"Loading base model from {self.model_name_or_path}")
             self.model = AutoModelForCausalLM.from_pretrained(
-                model_name_or_path, torch_dtype=torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
+                self.model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
 
-    
     def prompt2messages(self, prompt):
         messages = list()
         if self.system_prompt is not None:
@@ -85,6 +87,62 @@ class HuggingFaceLLM(BaseLLM):
         if verbose: print("Decoded output:\n", decoded_output)
         
         return decoded_output
+    
+    def batch_invoke(self, prompts, batch_size=8, max_new_tokens=2048, temperature=0.1):
+        """Generate answers for a batch of questions"""
+        self.model.eval()
+        all_responses = []
+        
+        for i in tqdm(range(0, len(prompts), batch_size), desc="Generating answers"):
+            batch_prompts = prompts[i:i + batch_size]
+            # Clear CUDA cache between batches
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            
+            # Prepare prompts
+            all_messages = []
+
+            for prompt in batch_prompts:
+                messages = self.prompt2messages(prompt)
+                formatted_prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
+                all_messages.append(formatted_prompt)
+            print(all_messages)
+            try:
+                    # Tokenize
+                inputs = self.tokenizer(
+                    all_messages, 
+                    return_tensors="pt", 
+                    padding=True,
+                    truncation=True,
+                    pad_to_multiple_of=8,
+                    max_length=max_new_tokens
+                ).to(self.model.device)
+            
+                # Generate
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        input_ids=inputs['input_ids'],
+                        attention_mask=inputs['attention_mask'],
+                        max_new_tokens=max_new_tokens,
+                        temperature=temperature,
+                        do_sample=True,
+                        top_p=0.9,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                        use_cache=True
+                    )
+            
+                # Decode
+                for j, output in enumerate(outputs):
+                    response = self.tokenizer.decode(output, skip_special_tokens=True)
+                    response = response[len(all_messages[j]):].strip()
+                    all_responses.append(response)
+            except RuntimeError as e:
+                logger.error(f"Error processing batch {i}: {str(e)}")
+                # Add empty responses for failed batch
+                all_responses.extend(["" for _ in range(len(batch_prompts))])
+                continue
+                
+        return all_responses
 
 
 def main():
