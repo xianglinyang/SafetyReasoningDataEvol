@@ -222,7 +222,17 @@ def batch_invoke(model_name_or_path, questions, device_map="cuda:0", batch_size=
     from transformers import AutoModelForCausalLM, AutoTokenizer
     model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.bfloat16, device_map=device_map)
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-    tokenizer.pad_token = '<pad>'
+    
+    # Properly set up padding token and ID
+    if tokenizer.pad_token is None:
+        if tokenizer.eos_token is not None:
+            tokenizer.pad_token = tokenizer.eos_token
+            tokenizer.pad_token_id = tokenizer.eos_token_id
+        else:
+            # If no eos token, use a common special token
+            tokenizer.pad_token = ' '
+            tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(' ')
+    
     tokenizer.padding_side = 'left'
 
     current_batch_size = batch_size
@@ -267,9 +277,12 @@ def batch_invoke(model_name_or_path, questions, device_map="cuda:0", batch_size=
                 )
             # Decode
             for j, output in enumerate(outputs):
-                response = tokenizer.decode(output, skip_special_tokens=True)
-                response = response[len(all_messages[j]):].strip()
-                all_responses.append(response)
+                # Get the length of the input sequence
+                input_length = inputs['input_ids'][j].shape[0]
+                # Decode only the generated part (everything after the input)
+                decoded_output = tokenizer.decode(output[input_length:], skip_special_tokens=True)
+                all_responses.append(decoded_output)
+                
         except RuntimeError as e:
             if "out of memory" in str(e) or "device-side assert triggered" in str(e):
                 # If we hit OOM, reduce batch size and retry this batch
@@ -340,9 +353,9 @@ def main():
 
     # logger.info("Processing dolly dataset...")
     # download_dolly()
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=32, max_new_tokens=2048)
     process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=32, max_new_tokens=2048)
 
 
 if __name__ == "__main__":
