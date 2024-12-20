@@ -53,13 +53,14 @@ class HuggingFaceLLM(BaseLLM):
             # load this way to make sure that optimizer states match the model structure
             config = LoraConfig.from_pretrained(self.model_name_or_path)
             base_model = AutoModelForCausalLM.from_pretrained(
-                config.base_model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
+                config.base_model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
             self.model = PeftModel.from_pretrained(
-                base_model, self.model_name_or_path, device_map=self.device, ignore_mismatched_sizes=True)
+                base_model, self.model_name_or_path, device_map=self.device)
         else:
             logger.info(f"Loading base model from {self.model_name_or_path}")
             self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device, ignore_mismatched_sizes=True)
+                self.model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
+            print("model loaded")
 
     def prompt2messages(self, prompt):
         messages = list()
@@ -87,69 +88,13 @@ class HuggingFaceLLM(BaseLLM):
         if verbose: print("Decoded output:\n", decoded_output)
         
         return decoded_output
-    
-    def batch_invoke(self, prompts, batch_size=8, max_new_tokens=2048, temperature=0.1):
-        """Generate answers for a batch of questions"""
-        self.model.eval()
-        all_responses = []
-        
-        for i in tqdm(range(0, len(prompts), batch_size), desc="Generating answers"):
-            batch_prompts = prompts[i:i + batch_size]
-            # Clear CUDA cache between batches
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            
-            # Prepare prompts
-            all_messages = []
-
-            for prompt in batch_prompts:
-                messages = self.prompt2messages(prompt)
-                formatted_prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
-                all_messages.append(formatted_prompt)
-            print(all_messages)
-            try:
-                    # Tokenize
-                inputs = self.tokenizer(
-                    all_messages, 
-                    return_tensors="pt", 
-                    padding=True,
-                    truncation=True,
-                    pad_to_multiple_of=8,
-                    max_length=max_new_tokens
-                ).to(self.model.device)
-            
-                # Generate
-                with torch.no_grad():
-                    outputs = self.model.generate(
-                        input_ids=inputs['input_ids'],
-                        attention_mask=inputs['attention_mask'],
-                        max_new_tokens=max_new_tokens,
-                        temperature=temperature,
-                        do_sample=True,
-                        top_p=0.9,
-                        pad_token_id=self.tokenizer.pad_token_id,
-                        use_cache=True
-                    )
-            
-                # Decode
-                for j, output in enumerate(outputs):
-                    response = self.tokenizer.decode(output, skip_special_tokens=True)
-                    response = response[len(all_messages[j]):].strip()
-                    all_responses.append(response)
-            except RuntimeError as e:
-                logger.error(f"Error processing batch {i}: {str(e)}")
-                # Add empty responses for failed batch
-                all_responses.extend(["" for _ in range(len(batch_prompts))])
-                continue
-                
-        return all_responses
 
 
 def main():
-    model_path = "out"
-    model = HuggingFaceLLM(model_name_or_path=model_path, device="cuda")
+    model_path = "meta-llama/Llama-3.1-8B-Instruct"
+    model = HuggingFaceLLM(model_name_or_path=model_path, device="cuda:0", torch_dtype=torch.bfloat16)
     prompt = "What is the capital of France?"
-    print(model.invoke(prompt, verbose=False))
+    print(model.invoke(prompt))
 
 # test function
 if __name__ == "__main__":
