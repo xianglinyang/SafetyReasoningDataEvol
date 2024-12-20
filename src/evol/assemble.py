@@ -15,12 +15,16 @@ import json
 import requests
 import random
 import logging
+import torch
+from tqdm import tqdm
 import argparse
 from datasets import load_dataset
 
 from src.evol.questions import QuestionStrategy
 from src.evol.answers import AnswerStrategy
 from src.logger.config import setup_logging
+# from src.llm_zoo.code_base_models import HuggingFaceLLM
+
 logger = logging.getLogger(__name__)
 
 #-------------------------Data evolution-------------------------
@@ -174,15 +178,16 @@ def process_circuitbreaker_dataset(train):
     logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
 
-def process_dolly():
-    logger.info(f"Processing dolly dataset...")
+def download_dolly():
+    logger.info(f"Downloading dolly dataset...")
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
 
     # dataset keys: category, prompt, llama3_output
     dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
     
-    data_evolver = DataEvolver()
-    _, answer_template = data_evolver.generate_templates(answer_output="normal")
+    # data_evolver = DataEvolver()
+    # _, answer_template = data_evolver.generate_templates(answer_output="normal")
+    # evolved_answer = answer_template.format(category=category, output=response)
 
     evolved_dataset = []
     for data in dataset:
@@ -192,16 +197,122 @@ def process_dolly():
         response = data['response']
         
         question = context + instruction
-        evolved_answer = answer_template.format(category=category, output=response)
         evolved_dataset.append({
             "category": category,
             "answer": response,
+            "instruction": instruction,
+            "context": context,
             "evolved_question": question,
-            "evolved_answer": evolved_answer
         })
 
     dump_json(evolved_dataset, processed_file_path)
-    logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
+    logger.info(f"Dolly dataset saved to {processed_file_path}")
+
+def batch_invoke(model_name_or_path, questions, device_map="cuda:0", batch_size=8, max_new_tokens=2048):
+    """Generate answers for a batch of questions"""
+    def prompt2messages(prompt):
+        from src.llm_zoo.model_configs import get_system_prompt
+        system_prompt = get_system_prompt(model_name_or_path)
+        messages = list()
+        if system_prompt is not None:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        return messages
+    
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.bfloat16, device_map=device_map)
+    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
+    tokenizer.pad_token = '<pad>'
+    tokenizer.padding_side = 'left'
+
+    current_batch_size = batch_size
+
+    model.eval()
+    all_responses = []
+    for i in tqdm(range(0, len(questions), current_batch_size), desc="Generating answers"):
+        batch_prompts = questions[i:i + current_batch_size]
+        # Clear CUDA cache between batches
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        try:
+            
+            # Prepare prompts
+            all_messages = []
+
+            for prompt in batch_prompts:
+                messages = prompt2messages(prompt)
+                formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+                all_messages.append(formatted_prompt)
+        # Tokenize
+            inputs = tokenizer(
+                all_messages, 
+                return_tensors="pt", 
+                padding=True,
+                truncation=True,
+                pad_to_multiple_of=8,
+                max_length=max_new_tokens
+            ).to(model.device)
+                
+            # Generate
+            with torch.no_grad():
+                outputs = model.generate(
+                    input_ids=inputs['input_ids'],
+                    attention_mask=inputs['attention_mask'],
+                    max_new_tokens=max_new_tokens,
+                    temperature=0.1,
+                    do_sample=True,
+                    top_p=0.9,
+                    pad_token_id=tokenizer.pad_token_id,
+                    use_cache=True
+                )
+            # Decode
+            for j, output in enumerate(outputs):
+                response = tokenizer.decode(output, skip_special_tokens=True)
+                response = response[len(all_messages[j]):].strip()
+                all_responses.append(response)
+        except RuntimeError as e:
+            if "out of memory" in str(e) or "device-side assert triggered" in str(e):
+                # If we hit OOM, reduce batch size and retry this batch
+                torch.cuda.empty_cache()
+                current_batch_size = max(1, current_batch_size // 2)
+                logger.warning(f"Reduced batch size to {current_batch_size} due to memory error")
+                i -= current_batch_size  # Retry this batch
+                continue
+            else:
+                raise e
+    return all_responses
+        
+
+def process_instruction_following_dataset(model_name_or_path, dataset_path, device_map="cuda:0", batch_size=8, max_new_tokens=2048):
+    """Process dataset and save with generated answers"""
+    # Load llm
+    logger.info(f"Loading model from {model_name_or_path}")
+    # TODO: Fixme: when in -m, use HuggingFaceLLM would cause error
+    # model = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch.bfloat16, device=device_map)
+    
+    # Load data
+    with open(dataset_path, 'r') as f:
+        dataset = json.load(f)
+    
+    # Extract questions
+    questions = [data['evolved_question'] for data in dataset]
+    
+    # Generate answers
+    logger.info(f"Generating answers for {len(questions)} questions")
+    # answers = model.batch_invoke(questions, batch_size=batch_size, max_new_tokens=max_new_tokens)
+    answers = batch_invoke(model_name_or_path, questions, batch_size=batch_size, max_new_tokens=max_new_tokens)
+    # Update dataset with generated answers
+    
+    for data, answer in zip(dataset, answers):
+        data[model_name_or_path] = answer
+    
+    # Save processed dataset
+    with open(dataset_path, 'w') as f:
+        json.dump(dataset, f)
+
+    logger.info(f"Dataset processed and saved to {dataset_path}")
+
+
 
 #TODO
 # open instruction dataset
@@ -224,12 +335,18 @@ def main():
     # download_circuitbreaker_dataset(train=False)
 
     # logger.info("Processing circuitbreaker dataset...")
-    process_circuitbreaker_dataset(train=True) 
-    process_circuitbreaker_dataset(train=False) 
+    # process_circuitbreaker_dataset(train=True) 
+    # process_circuitbreaker_dataset(train=False) 
 
     # logger.info("Processing dolly dataset...")
-    process_dolly()
+    # download_dolly()
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
 
 
 if __name__ == "__main__":
+    # import os
+    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     main()
