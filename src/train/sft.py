@@ -48,20 +48,22 @@ def main():
 
     # Load datasets for training and validation
     train_dataset = SafetyReasoningDataset(
+        model_name=model_args.model_name_or_path,
         dataset_name=data_args.dataset_name,
         split="train",
         tokenizer=tokenizer,
         ratio=data_args.ratio,
         max_length=data_args.max_seq_length,
-        system_inst=get_system_prompt(model_args.model_name_or_path)
+        # system_inst=get_system_prompt(model_args.model_name_or_path)
     )
     val_dataset = SafetyReasoningDataset(
+        model_name=model_args.model_name_or_path,
         dataset_name=data_args.dataset_name,
         split="val",
         tokenizer=tokenizer,
         max_length=data_args.max_seq_length,
         ratio=data_args.ratio,
-        system_inst=get_system_prompt(model_args.model_name_or_path)
+        # system_inst=get_system_prompt(model_args.model_name_or_path)
     )
 
     trainer = Trainer(

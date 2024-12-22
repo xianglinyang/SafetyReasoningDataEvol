@@ -7,13 +7,14 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="torchrun --nproc_per_node=1 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
---max_seq_length 1024 \
+--ratio 0.5 \
+--max_seq_length 2048 \
 --lora True \
---lora_r 128 \
---lora_alpha 512 \
+--lora_r 64 \
+--lora_alpha 256 \
 --lora_dropout 0.1 \
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
@@ -21,7 +22,7 @@ base_arguments="\
 --per_device_train_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 4 \
+--num_train_epochs 1 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -31,10 +32,7 @@ base_arguments="\
 --do_eval True \
 --evaluation_strategy steps \
 --eval_steps 100 \
---save_strategy steps \
---save_steps 500 \
---save_total_limit 3 \
---load_best_model_at_end True \
+--save_strategy no \
 --metric_for_best_model loss \
 --greater_is_better False \
 --ddp_find_unused_parameters False \
@@ -45,8 +43,10 @@ base_arguments="\
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
-model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.1")
-model_name_abbrs=("llama2-7b" "llama3-8b" "mistral-7b")
+# model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
+# model_name_abbrs=("llama2-7b" "llama3-8b" "mistral-7b")
+model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "mistralai/Mistral-7B-Instruct-v0.2")
+model_name_abbrs=("llama2-7b" "mistral-7b")
 
 out_dir="outputs"
 
@@ -55,8 +55,8 @@ for dataset_name in ${dataset_names[@]}; do
     # loop through each model
     for i in "${!model_name_or_paths[@]}"; do
 
-        # output dir format with model name+date
-        output_dir="${out_dir}/${dataset_name}/${model_name_abbrs[$i]}_$(date +%Y%m%d)"
+        # output dir format with model name+date+time
+        output_dir="${out_dir}/${dataset_name}/${model_name_abbrs[$i]}_$(date +%Y%m%d-%H%M%S)"
         if [[ ! -d $output_dir ]]; then
             mkdir -p $output_dir
         fi

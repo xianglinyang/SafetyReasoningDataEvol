@@ -22,8 +22,8 @@ from datasets import load_dataset
 
 from src.evol.questions import QuestionStrategy
 from src.evol.answers import AnswerStrategy
+from src.llm_zoo.utils import batch_invoke, load_model, load_tokenizer
 from src.logger.config import setup_logging
-# from src.llm_zoo.code_base_models import HuggingFaceLLM
 
 logger = logging.getLogger(__name__)
 
@@ -43,52 +43,40 @@ class DataEvolver:
         # load the strategies that are supported by both question and answer strategies
         self._strategies = self.question_strategy._strategies
         logger.info(f"Strategies: {self._strategies}")
-        self.question_templates = self._load_question_templates()
+        self._load_question_templates()
 
     def _load_question_templates(self):
         self.question_templates = {}
         for strategy in self._strategies:
             self.question_templates[strategy] = self.question_strategy.templates[strategy]
-        return self.question_templates
+        self.merged_question_templates = list()
+        for strategy in self._strategies:
+            self.merged_question_templates.extend(self.question_templates[strategy])
 
     def sample_strategy(self):
         strategy = random.choice(self._strategies)
         return strategy
     
-    def evol_data(self, question_template, answer_template, question: str, question_category: str, answer_output: str):
+    def evol_data(self, question_template, question: str, answer_output: str, refusal=True):
         question_instance = question_template.format(question=question)
-        answer_instance = answer_template.format(category=question_category, output=answer_output)
-        return question_instance, answer_instance
-    
-    def generate_templates(self, answer_output="refusal"):
-        # load the question templates
-        question_templates = list()
-        for strategy in self._strategies:
-            question_templates.extend(self.question_templates[strategy])
-        # load the answer template
-        if answer_output == "refusal":
-            answer_template = self.answer_strategy.refusal_format
-        elif answer_output == "normal":
-            answer_template = self.answer_strategy.normal_format
+        if refusal:
+            answer_instance = self.answer_strategy.safe_cot(question, answer_output)
         else:
-            logger.error(f"Invalid output type: {answer_output}")
-            return None, None
-        return question_templates, answer_template
+            answer_instance = self.answer_strategy.normal_cot(question, answer_output)
+        return question_instance, answer_instance
   
-    def evol_dataset(self, dataset: list, output="refusal") -> list:
+    def evol_dataset(self, dataset: list, refusal=True) -> list:
         """Evolve an entire dataset of question-answer pairs"""
-        question_templates, answer_template = self.generate_templates(output)
-        if len(question_templates) < len(dataset):
-            logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(question_templates)} templates are available.")
+
+        if len(self.merged_question_templates) < len(dataset):
+            logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(self.merged_question_templates)} templates are available.")
             return []
         # shuffle the questions
-        random.shuffle(question_templates)
+        random.shuffle(self.merged_question_templates)
 
         evolved_dataset = list()
-        for (question, question_category, output), question_template in zip(dataset, question_templates):
-            if question_category is None:
-                question_category = "unsafe content"
-            question_instance, answer_instance = self.evol_data(question_template, answer_template, question, question_category)
+        for (question, output), question_template in zip(dataset, self.merged_question_templates):
+            question_instance, answer_instance = self.evol_data(question_template, question, output, refusal)
             evolved_dataset.append({
                 "evolved_question": question_instance.strip(),
                 "evolved_answer": answer_instance.strip(),
@@ -136,58 +124,12 @@ def download_circuitbreaker_dataset(train):
     logger.info(f"Circuitbreaker {file_path} downloaded")
 
 
-def process_circuitbreaker_dataset(train):
-    logger.info(f"Processing circuitbreaker {train} dataset...")
-    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
-    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
-
-    # dataset keys: category, prompt, llama3_output
-    with open(raw_file_path, 'r') as f:
-        dataset = json.load(f)
-    data_evolver = DataEvolver()
-
-    question_templates, answer_template = data_evolver.generate_templates(answer_output="refusal")
-    if len(question_templates) < len(dataset):
-        logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(question_templates)} templates are available.")
-        return
-    else:
-        random.shuffle(question_templates)
-        question_templates = question_templates[:len(dataset)]
-
-    # merge the original dataset and the evolved dataset
-    merged_dataset = []
-    for i in range(len(dataset)):
-        question_template = question_templates[i]
-        question = dataset[i]['prompt']
-        question_category = "unsafe content" if 'category' not in dataset[i] else dataset[i]['category']
-        refusal_answer = dataset[i]['llama3_output']
-        output = dataset[i]['output']
-        evolved_question = question_template.format(question=question)
-        evolved_answer = answer_template.format(category=question_category, output=refusal_answer)
-        
-        merged_dataset.append({
-            "category": question_category,
-            "refusal_answer": refusal_answer,
-            "output": output,
-            "question": question,
-            "evolved_question": evolved_question,
-            "evolved_answer": evolved_answer
-        })
-
-    dump_json(merged_dataset, processed_file_path)
-    logger.info(f"Evolved train dataset saved to {processed_file_path}")
-
-
 def download_dolly():
     logger.info(f"Downloading dolly dataset...")
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
 
     # dataset keys: category, prompt, llama3_output
     dataset = load_dataset("databricks/databricks-dolly-15k", split="train")
-    
-    # data_evolver = DataEvolver()
-    # _, answer_template = data_evolver.generate_templates(answer_output="normal")
-    # evolved_answer = answer_template.format(category=category, output=response)
 
     evolved_dataset = []
     for data in dataset:
@@ -208,100 +150,163 @@ def download_dolly():
     dump_json(evolved_dataset, processed_file_path)
     logger.info(f"Dolly dataset saved to {processed_file_path}")
 
-def batch_invoke(model_name_or_path, questions, device_map="cuda:0", batch_size=8, max_new_tokens=2048):
-    """Generate answers for a batch of questions"""
-    def prompt2messages(prompt):
-        from src.llm_zoo.model_configs import get_system_prompt
-        system_prompt = get_system_prompt(model_name_or_path)
-        messages = list()
-        if system_prompt is not None:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        return messages
-    
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.bfloat16, device_map=device_map)
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-    
-    # Properly set up padding token and ID
-    if tokenizer.pad_token is None:
-        if tokenizer.eos_token is not None:
-            tokenizer.pad_token = tokenizer.eos_token
-            tokenizer.pad_token_id = tokenizer.eos_token_id
-        else:
-            # If no eos token, use a common special token
-            tokenizer.pad_token = ' '
-            tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(' ')
-    
-    tokenizer.padding_side = 'left'
+#-------------------------Data Processing-------------------------
+def process_circuitbreaker_dataset(train):
+    logger.info(f"Processing circuitbreaker {train} dataset...")
+    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
 
-    current_batch_size = batch_size
+    # dataset keys: category, prompt, llama3_output
+    with open(raw_file_path, 'r') as f:
+        dataset = json.load(f)
 
-    model.eval()
-    all_responses = []
-    for i in tqdm(range(0, len(questions), current_batch_size), desc="Generating answers"):
-        batch_prompts = questions[i:i + current_batch_size]
-        # Clear CUDA cache between batches
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        try:
+    data_evolver = DataEvolver()
+    question_templates = data_evolver.merged_question_templates
+    if len(question_templates) < len(dataset):
+        logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(question_templates)} templates are available.")
+        return
+    else:
+        random.shuffle(question_templates)
+        question_templates = question_templates[:len(dataset)]
+    
+    count = 0
+    merged_dataset = []
+    for data, question_template in tqdm(zip(dataset, question_templates), desc="Evolving dataset"):
+        question = data['prompt']
+        refusal_output = data['llama3_output']
+        question_instance, answer_instance = data_evolver.evol_data(question_template, question, refusal_output, refusal=True)
+        new_data = {
+            "category": data['category'] if 'category' in data else "",
+            "question": question,
+            "refusal_output": refusal_output,
+            "output": data["output"],
+            "evolved_question": question_instance,
+            "evolved_answer": answer_instance
+        }
+        merged_dataset.append(new_data)
+        count += 1
+        logger.info(f"Evolved {count} Question: {question_instance}")
+        logger.info(f"Evolved {count} Answer: {answer_instance}")
+    
+    dump_json(merged_dataset, processed_file_path)
+    logger.info(f"Evolved train dataset saved to {processed_file_path}")
+
+
+def process_dolly():
+    logger.info(f"Processing dolly dataset...")
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
+
+    with open(processed_file_path, 'r') as f:
+        dataset = json.load(f)
+    
+    data_evolver = DataEvolver()
+    count = 0
+    
+    for data in tqdm(dataset, desc="Evolving Dolly dataset"):
+        count += 1
+        question = data['evolved_question']
+        output = data['answer']
+        evolved_answer = data_evolver.answer_strategy.normal_cot(question=question, response=output)
+        data['evolved_answer'] = evolved_answer
+        
+        logger.info(f"{count} Question: {question}")
+        logger.info(f"Evolved {count} Answer: {evolved_answer}")
+
+    with open(processed_file_path, 'w') as f:
+        json.dump(dataset, f)
+    logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
+
+# # TODO: move to llm_zoo
+# def batch_invoke(model_name_or_path, questions, device_map="cuda:0", batch_size=8, max_new_tokens=2048):
+#     """Generate answers for a batch of questions"""
+#     def prompt2messages(prompt):
+#         from src.llm_zoo.model_configs import get_system_prompt
+#         system_prompt = get_system_prompt(model_name_or_path)
+#         messages = list()
+#         if system_prompt is not None:
+#             messages.append({"role": "system", "content": system_prompt})
+#         messages.append({"role": "user", "content": prompt})
+#         return messages
+    
+#     from transformers import AutoModelForCausalLM, AutoTokenizer
+#     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, padding_side='left')
+#     tokenizer.padding_side = 'left'
+#     # Properly set up padding token and ID
+#     if tokenizer.pad_token is None:
+#         if tokenizer.eos_token is not None:
+#             tokenizer.pad_token = tokenizer.eos_token
+#             tokenizer.pad_token_id = tokenizer.eos_token_id
+#         else:
+#             # If no eos token, use a common special token
+#             tokenizer.pad_token = ' '
+#             tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(' ')
+    
+#     model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch.bfloat16, device_map=device_map)
+#     current_batch_size = batch_size
+
+#     model.eval()
+#     all_responses = []
+#     for i in tqdm(range(0, len(questions), current_batch_size), desc="Generating answers"):
+#         batch_prompts = questions[i:i + current_batch_size]
+#         # Clear CUDA cache between batches
+#         if torch.cuda.is_available():
+#             torch.cuda.empty_cache()
+#         try:
             
-            # Prepare prompts
-            all_messages = []
+#             # Prepare prompts
+#             all_messages = []
 
-            for prompt in batch_prompts:
-                messages = prompt2messages(prompt)
-                formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
-                all_messages.append(formatted_prompt)
-        # Tokenize
-            inputs = tokenizer(
-                all_messages, 
-                return_tensors="pt", 
-                padding=True,
-                truncation=True,
-                pad_to_multiple_of=8,
-                max_length=max_new_tokens
-            ).to(model.device)
+#             for prompt in batch_prompts:
+#                 messages = prompt2messages(prompt)
+#                 formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
+#                 all_messages.append(formatted_prompt)
+#         # Tokenize
+#             inputs = tokenizer(
+#                 all_messages, 
+#                 return_tensors="pt", 
+#                 padding=True,
+#                 truncation=True,
+#                 pad_to_multiple_of=8,
+#                 max_length=max_new_tokens
+#             ).to(model.device)
                 
-            # Generate
-            with torch.no_grad():
-                outputs = model.generate(
-                    input_ids=inputs['input_ids'],
-                    attention_mask=inputs['attention_mask'],
-                    max_new_tokens=max_new_tokens,
-                    temperature=0.1,
-                    do_sample=True,
-                    top_p=0.9,
-                    pad_token_id=tokenizer.pad_token_id,
-                    use_cache=True
-                )
-            # Decode
-            for j, output in enumerate(outputs):
-                # Get the length of the input sequence
-                input_length = inputs['input_ids'][j].shape[0]
-                # Decode only the generated part (everything after the input)
-                decoded_output = tokenizer.decode(output[input_length:], skip_special_tokens=True)
-                all_responses.append(decoded_output)
+#             # Generate
+#             with torch.no_grad():
+#                 outputs = model.generate(
+#                     input_ids=inputs['input_ids'],
+#                     attention_mask=inputs['attention_mask'],
+#                     max_new_tokens=max_new_tokens,
+#                     temperature=0.1,
+#                     do_sample=True,
+#                     top_p=0.9,
+#                     pad_token_id=tokenizer.pad_token_id,
+#                     use_cache=True
+#                 )
+#             # Decode
+#             for j, output in enumerate(outputs):
+#                 # Get the length of the input sequence
+#                 input_length = inputs['input_ids'][j].shape[0]
+#                 # Decode only the generated part (everything after the input)
+#                 decoded_output = tokenizer.decode(output[input_length:], skip_special_tokens=True)
+#                 all_responses.append(decoded_output)
                 
-        except RuntimeError as e:
-            if "out of memory" in str(e) or "device-side assert triggered" in str(e):
-                # If we hit OOM, reduce batch size and retry this batch
-                torch.cuda.empty_cache()
-                current_batch_size = max(1, current_batch_size // 2)
-                logger.warning(f"Reduced batch size to {current_batch_size} due to memory error")
-                i -= current_batch_size  # Retry this batch
-                continue
-            else:
-                raise e
-    return all_responses
+#         except RuntimeError as e:
+#             if "out of memory" in str(e) or "device-side assert triggered" in str(e):
+#                 # If we hit OOM, reduce batch size and retry this batch
+#                 torch.cuda.empty_cache()
+#                 current_batch_size = max(1, current_batch_size // 2)
+#                 logger.warning(f"Reduced batch size to {current_batch_size} due to memory error")
+#                 i -= current_batch_size  # Retry this batch
+#                 continue
+#             else:
+#                 raise e
+#     return all_responses
         
 
 def process_instruction_following_dataset(model_name_or_path, dataset_path, device_map="cuda:0", batch_size=8, max_new_tokens=2048):
     """Process dataset and save with generated answers"""
     # Load llm
     logger.info(f"Loading model from {model_name_or_path}")
-    # TODO: Fixme: when in -m, use HuggingFaceLLM would cause error
-    # model = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch.bfloat16, device=device_map)
     
     # Load data
     with open(dataset_path, 'r') as f:
@@ -312,10 +317,11 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
     
     # Generate answers
     logger.info(f"Generating answers for {len(questions)} questions")
-    # answers = model.batch_invoke(questions, batch_size=batch_size, max_new_tokens=max_new_tokens)
-    answers = batch_invoke(model_name_or_path, questions, batch_size=batch_size, max_new_tokens=max_new_tokens)
-    # Update dataset with generated answers
+    model = load_model(model_name_or_path, device_map=device_map)
+    tokenizer = load_tokenizer(model_name_or_path)
+    answers = batch_invoke(model, tokenizer, questions, batch_size=batch_size, max_new_tokens=max_new_tokens)
     
+    # Update dataset with generated answers
     for data, answer in zip(dataset, answers):
         data[model_name_or_path] = answer
     
@@ -341,25 +347,29 @@ def main():
     # run_id = args.run_id
 
     # setup_logging(task_name="data_evol", run_id=run_id)
+    setup_logging(task_name="data_evol", run_id=0)
     # logger.info("Assembling data...")
 
     # logger.info("Downloading circuitbreaker dataset...")
     # download_circuitbreaker_dataset(train=True)
     # download_circuitbreaker_dataset(train=False)
 
-    # logger.info("Processing circuitbreaker dataset...")
+    logger.info("Processing circuitbreaker dataset...")
     # process_circuitbreaker_dataset(train=True) 
-    # process_circuitbreaker_dataset(train=False) 
+    process_circuitbreaker_dataset(train=False) 
+
 
     # logger.info("Processing dolly dataset...")
     # download_dolly()
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=32, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=28, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=32, max_new_tokens=2048)
+    # process_dolly()
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
 
 
 if __name__ == "__main__":
     # import os
     # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+    
     main()

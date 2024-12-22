@@ -12,12 +12,14 @@ class SafetyReasoningDataset(Dataset):
     def __init__(self, 
                 dataset_name: str,      # 'circuitbreaker'
                 split: str,             # train/val/test
+                model_name: str,         # 'llama3'
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
                 ratio: float = 0.5,
-                system_inst=None
+                system_inst: str = None,
                 ):
         super(SafetyReasoningDataset, self).__init__()
+        self.model_name = model_name
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.ratio = ratio
@@ -36,7 +38,7 @@ class SafetyReasoningDataset(Dataset):
             dolly = json.load(f)
         
         self.dataset = list()
-        # original data
+        # original data with evolved question and answer
         for data in circuitbreaker:
             evolved_question = data['evolved_question']
             evolved_answer = data['evolved_answer']
@@ -44,6 +46,7 @@ class SafetyReasoningDataset(Dataset):
                 "question": evolved_question,
                 "answer": evolved_answer
             })
+        # original data with original question and answer
         for data in circuitbreaker:
             question = data['question']
             evolved_answer = data['evolved_answer']
@@ -51,15 +54,21 @@ class SafetyReasoningDataset(Dataset):
                 "question": question,
                 "answer": evolved_answer
             })
-        # load dolly dataset
+        # load other instructions data
+        # dolly dataset
+        # TODO use the llm generated data
         num = int(len(self.dataset) / self.ratio - len(self.dataset))
         dolly = random.sample(dolly, num)
+
         for data in dolly:
             question = data['evolved_question']
             answer = data['evolved_answer']
+            refusal_part = answer.split('#### Response')[0]
+            output = data[self.model_name]
+            new_answer = refusal_part+"#### Response\n"+output
             self.dataset.append({
                 "question": question,
-                "answer": answer
+                "answer": new_answer
             })
         
         # shuffle the dataset
@@ -76,8 +85,8 @@ class SafetyReasoningDataset(Dataset):
 
         # format data
         messages = list()
-        if self.system_inst is not None:
-            messages.append({"role": "system", "content": self.system_inst})
+        # if self.system_inst is not None:
+        #     messages.append({"role": "system", "content": self.system_inst})
         messages.append({"role": "user", "content": question})
         messages.append({"role": "assistant", "content": answer})
 
