@@ -25,7 +25,6 @@ class SafetyReasoningDataset(Dataset):
         self.ratio = ratio
         self.system_inst = system_inst
         self._load_data(dataset_name, split)
-    
 
     def _load_data(self, dataset_name, split):
         # circuitbreaker original data+ processed data
@@ -54,17 +53,19 @@ class SafetyReasoningDataset(Dataset):
                 "question": question,
                 "answer": evolved_answer
             })
-        # load other instructions data
-        # dolly dataset
-        # TODO use the llm generated data
+
         num = int(len(self.dataset) / self.ratio - len(self.dataset))
         dolly = random.sample(dolly, num)
 
         for data in dolly:
             question = data['evolved_question']
             answer = data['evolved_answer']
-            refusal_part = answer.split('#### Response')[0]
+            # clean format
             output = data[self.model_name]
+            if output.startswith('assistant\n\n'):
+                output = output[10:]
+            refusal_part = answer.split('#### Response')[0]
+
             new_answer = refusal_part+"#### Response\n"+output
             self.dataset.append({
                 "question": question,
