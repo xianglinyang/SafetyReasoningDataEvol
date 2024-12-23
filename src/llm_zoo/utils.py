@@ -20,7 +20,7 @@ def load_tokenizer(model_name_or_path):
             # If no eos token, use a common special token
             tokenizer.pad_token = ' '
             tokenizer.pad_token_id = tokenizer.convert_tokens_to_ids(' ')
-
+    return tokenizer
 
 def load_model(model_name_or_path, device_map="cuda:0", torch_dtype=torch.bfloat16):
     model = AutoModelForCausalLM.from_pretrained(model_name_or_path, torch_dtype=torch_dtype, device_map=device_map)
@@ -40,6 +40,7 @@ def prompt2messages(prompt, model_name_or_path):
 def batch_invoke(model, tokenizer, questions, batch_size=8, max_new_tokens=2048):
     """Generate answers for a batch of questions"""
     current_batch_size = batch_size
+    model_name = model.config.name_or_path
 
     all_responses = []
     for i in tqdm(range(0, len(questions), current_batch_size), desc="Generating answers"):
@@ -53,7 +54,7 @@ def batch_invoke(model, tokenizer, questions, batch_size=8, max_new_tokens=2048)
             all_messages = []
 
             for prompt in batch_prompts:
-                messages = prompt2messages(prompt)
+                messages = prompt2messages(prompt, model_name)
                 formatted_prompt = tokenizer.apply_chat_template(messages, tokenize=False)
                 all_messages.append(formatted_prompt)
         # Tokenize
