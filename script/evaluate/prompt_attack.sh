@@ -1,24 +1,24 @@
 #!/bin/bash
-# export CUDA_VISIBLE_DEVICES
-jobs_num=2
-gpu_num=2
+export CUDA_VISIBLE_DEVICES=0
+jobs_num=1
+gpu_num=1
 
 model_name_or_path_list=(
-    # "meta-llama/Llama-2-7b-chat-hf"
-    "meta-llama/Llama-3.1-8B-Instruct"
-    "mistralai/Mistral-7B-Instruct-v0.1"
     "outputs/circuitbreaker/llama2-7b"
-    "outputs/circuitbreaker/llama3-8b"
-    "outputs/circuitbreaker/mistral-7b"
-)
+#     "outputs/circuitbreaker/llama3-8b"
+#     "outputs/circuitbreaker/mistral-7b"
+#     "meta-llama/Llama-2-7b-chat-hf"
+#     "meta-llama/Llama-3.1-8B-Instruct"
+#     "mistralai/Mistral-7B-Instruct-v0.1"
+# )
 dataset_name_list=(
-    # "sorrybench"
+    "sorrybench"
     "jailbreakbench"
-    # "advbench"
+    "advbench"
 )
 attack_name_list=(
     "none"
-    "refusal_suppression"
+    # "refusal_suppression"
     # "prefix_injection"
 )
 
@@ -28,7 +28,7 @@ base_arguments="\
 --split train \
 --device cuda \
 --torch_type bf16 \
---eval_num 200"
+--eval_num 500"
 
 # Counter to distribute commands across GPUs
 counter=0
