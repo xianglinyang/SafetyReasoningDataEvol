@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "safety-reasoning-data-evol"
+version = "0.1.0"
+description = "The data evol script to enhance the safety reasoning ability and defense ability."
+authors = ["Yang Xianglin <yxlyzxl@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+datasets = "^3.2.0"
+litellm = "^1.55.9"
+peft = "^0.14.0"
+tqdm = "^4.67.1"
+torch = "^2.5.1"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
