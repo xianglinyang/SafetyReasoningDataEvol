@@ -181,7 +181,7 @@ def llamaguard2_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
     return classifications
 
 # openai judge fn
-async def openai_judge_one_fn(response: str) -> int:
+def openai_judge_one_fn(response: str) -> int:
     llm = OpenAILLM(model_name="gpt-4o-mini")
     cleansing_prompt = f"""\
     #### Instruction
@@ -197,18 +197,18 @@ async def openai_judge_one_fn(response: str) -> int:
     #### Extracted Answer
 
     """
-    response = await llm.invoke(cleansing_prompt)
+    response = llm.invoke(cleansing_prompt)
     return response
 
 
-async def openai_judge_dataset_fn(responses: List[str]) -> List[int]:
+def openai_judge_dataset_fn(responses: List[str]) -> List[int]:
     t0 = time.time()
     
     correct = [0] * len(responses)
     
     # Process evaluations sequentially
     for i, response in enumerate(tqdm(responses)):
-        correct[i] = int(await openai_judge_one_fn(response))
+        correct[i] = int(openai_judge_one_fn(response))
 
     return correct, time.time() - t0
 

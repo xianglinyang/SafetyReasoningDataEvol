@@ -346,7 +346,7 @@ def answer_cleansing_with_regex(dataset, llm_answer):
     return answer
 
 
-async def answer_cleansing_with_llm(dataset, llm_answer):
+def answer_cleansing_with_llm(dataset, llm_answer):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
     # Currently, we use 4o-mini model to extract the answer from the reasoning output
     llm = OpenAILLM(model_name="gpt-4o-mini")
@@ -362,7 +362,7 @@ async def answer_cleansing_with_llm(dataset, llm_answer):
     #### Extracted Answer
     {zero_shot_answer_trigger(dataset)}
     """
-    response = await llm.invoke(cleansing_prompt)
+    response = llm.invoke(cleansing_prompt)
     return response
 
 

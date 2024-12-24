@@ -34,7 +34,7 @@ from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleans
 
 logger = logging.getLogger(__name__)
 
-async def process_single_evaluation(llm, dataset_name, question, answer, idx):
+def process_single_evaluation(llm, dataset_name, question, answer, idx):
     trigger = "Solve the following problem:\n\n"
     llm_answer = llm.invoke(trigger + question)
     
@@ -42,7 +42,7 @@ async def process_single_evaluation(llm, dataset_name, question, answer, idx):
     logger.info(f"[GT answer]: {answer}")
     logger.info(f"[LLM Answer]: {llm_answer}")
     
-    pred_answer = await answer_cleansing_with_llm(dataset_name, question+"\n\n"+llm_answer)
+    pred_answer = answer_cleansing_with_llm(dataset_name, question+"\n\n"+llm_answer)
     clean_answer = gt_answer_cleansing(dataset_name, answer)
     
     logger.info(f"[Pred answer]: {pred_answer}")
@@ -50,7 +50,7 @@ async def process_single_evaluation(llm, dataset_name, question, answer, idx):
     
     return int(clean_answer == pred_answer)
 
-async def evaluate_reasoning_async(llm, dataset_name, dataset, eval_num=-1):
+def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
     t0 = time.time()
 
     if eval_num == -1:
@@ -66,31 +66,31 @@ async def evaluate_reasoning_async(llm, dataset_name, dataset, eval_num=-1):
     # Process evaluations sequentially
     for i, idx in enumerate(tqdm(eval_idxs)):
         question, _, answer = dataset[idx]
-        correct[i] = await process_single_evaluation(llm, dataset_name, question, answer, idx)
+        correct[i] = process_single_evaluation(llm, dataset_name, question, answer, idx)
 
-    return correct, time.time() - t0
+    return sum(correct) / len(correct), time.time() - t0
 
-def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
-    # # For Jupyter notebooks
-    # try:
-    #     import nest_asyncio
-    #     nest_asyncio.apply()
-    # except ImportError:
-    #     pass
+# def evaluate_reasoning_async(llm, dataset_name, dataset, eval_num=-1):
+#     # # For Jupyter notebooks
+#     # try:
+#     #     import nest_asyncio
+#     #     nest_asyncio.apply()
+#     # except ImportError:
+#     #     pass
     
-    # Create and run the event loop
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+#     # Create and run the event loop
+#     loop = asyncio.get_event_loop()
+#     if loop.is_closed():
+#         loop = asyncio.new_event_loop()
+#         asyncio.set_event_loop(loop)
     
-    try:
-        correct, elapsed_time = loop.run_until_complete(
-            evaluate_reasoning_async(llm, dataset_name, dataset, eval_num)
-        )
-        return sum(correct) / len(correct), elapsed_time
-    finally:
-        pass
+#     try:
+#         correct, elapsed_time = loop.run_until_complete(
+#             evaluate_reasoning_async(llm, dataset_name, dataset, eval_num)
+#         )
+#         return sum(correct) / len(correct), elapsed_time
+#     finally:
+#         pass
 
 def save_results(results: Dict, path="eval_results"):
     if not os.path.exists(path):
