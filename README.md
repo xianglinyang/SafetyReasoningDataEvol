@@ -7,17 +7,24 @@
 - https://github.com/allenai/open-instruct/tree/main
 
 # Run Instructions
-
-1. prepare prompt templates variants
+1. evol the question+ download the dataset
 ```bash
-python src/evol/question_evol.py
-python src/evol/answer_evol.py
+bash script/evol/data_evol.sh
 ```
-2. download and assemble data
+2. train model
 ```bash
-python src/evol/assemble.py
+bash script/train/lora_train.sh
 ```
-3. train model
+# Evaluate instruction
+1. download HarmBench repo
 ```bash
-python src/train.py
+git clone https://github.com/centerforaisafety/HarmBench.git
+```
+Read evaluation pipeline in HarmBench repo
+2. modify the configs
+- models.yaml
+- run_pipeline.yaml
+3. run the pipeline
+```bash
+python scripts/run_pipeline.py
 ```
