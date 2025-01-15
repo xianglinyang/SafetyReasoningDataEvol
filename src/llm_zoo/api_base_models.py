@@ -17,7 +17,7 @@ import asyncio
 
 from src.llm_zoo.base_model import BaseLLM 
 '''system prompt'''
-SYSTEM_PROMPT = "You are a helpful, respectful and honest assistant."
+SYSTEM_PROMPT = "You are a helpful assistant."
 
 '''Model class of different providers'''
 class OpenAILLM(BaseLLM):
