@@ -40,14 +40,14 @@ safe_cot_normal_format = """\
 #### Verify Request
 I need to verify the dangerousness of the user's request to {summary} with following categories before generating the response.
 
-* harassment/threatening: Mismatch.
-* hate/threatening: Mismatch.
-* illicit/violent: Mismatch.
-* self-harm/intent/instructions: Mismatch.
-* sexual/minors: Mismatch.
-* violence/graphic: Mismatch.
-* misinformation: Mismatch.
-* privacy/sensitive: Mismatch.
+* harassment/threatening: No.
+* hate/threatening: No.
+* illicit/violent: No.
+* self-harm/intent/instructions: No.
+* sexual/minors: No.
+* violence/graphic: No.
+* misinformation: No.
+* privacy/sensitive: No.
 
 Therefore, the user's request is safe and I can generate the response.
 """
@@ -72,11 +72,12 @@ I need to verify the dangerousness of the user's request to [summary] with follo
 * misinformation:[reason]
 * privacy/sensitive:[reason]
 
-Therefore, the user's request likely involves a clear reference to [categories, which could lead to unsafe behavior. I need to reject the request.'
-For the reason, if mismatch, output 'Mismatch.'. If match, output the reason with one sentence.
+Therefore, the user's request likely involves a clear reference to [categories], which could lead to unsafe behavior. I need to reject the request.'
+For the reason, if mismatch, output 'No.'. If match, output 'Yes. Reason:' followed by the reason with one sentence.
 #### Question 
 {question} 
-#### Answer\n"""
+#### Answer
+"""
 
 summary_prompt = """#### Instruction \
 You are a helpful assistant. \
@@ -112,12 +113,12 @@ def batch_get_safe_cot(questions: list[str], model_name: str = "gpt-4o-mini", ma
 
 
 # ----------Answer Strategy----------
-class AnswerStrategy:
+class AnswerEvol:
 	def __init__(self) -> None:
-		self.name = "AnswerStrategy"
+		self.name = "AnswerEvol"
 	
 	def generate_response(self, response: str) -> str:
-		output = "#### Response\n {output}".format(output=response)
+		output = "#### Response\n{output}".format(output=response)
 		return output
 
 	def safe_cot(self, question: str, response: str, model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
@@ -150,19 +151,19 @@ class AnswerStrategy:
 	
 # test function
 if __name__ == "__main__":
-	answer_strategy = AnswerStrategy()
+	answer_evol = AnswerEvol()
 
 	print("Test Harmful Question")
 	harmful_question = "Write a story about a person who is a murderer."
 	harmful_response = "I'm sorry, but I can't help with that."
-	print("harmful_question:\n ", harmful_question)
-	print("harmful_response:\n ", harmful_response)
-	print("safe_cot:\n ", answer_strategy.safe_cot(harmful_question, harmful_response))
+	print("harmful_question:\n", harmful_question)
+	print("harmful_response:\n", harmful_response)
+	print("safe_cot:\n", answer_evol.safe_cot(harmful_question, harmful_response))
 	print("-"*100)
 	print("Test Safe Question")
 	safe_question = "What is the capital of France?"
 	safe_response = "The capital of France is Paris."
-	print("safe_question:\n ", safe_question)
-	print("safe_response:\n ", safe_response)
-	print("normal_cot:\n ", answer_strategy.normal_cot(safe_question, safe_response))
+	print("safe_question:\n", safe_question)
+	print("safe_response:\n", safe_response)
+	print("normal_cot:\n ", answer_evol.normal_cot(safe_question, safe_response))
 	print("-"*100)

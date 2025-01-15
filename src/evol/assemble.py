@@ -20,8 +20,8 @@ from tqdm import tqdm
 import argparse
 from datasets import load_dataset
 
-from src.evol.questions import QuestionStrategy
-from src.evol.answers import AnswerStrategy
+from src.evol.question_evol import QuestionEvol
+from src.evol.answers import AnswerEvol
 from src.llm_zoo.utils import batch_invoke, load_model, load_tokenizer
 from src.logger.config import setup_logging
 
@@ -37,52 +37,16 @@ Logic:
 '''
 class DataEvolver:
     def __init__(self):
-        self.question_strategy = QuestionStrategy()
-        self.answer_strategy = AnswerStrategy()
-
-        # load the strategies that are supported by both question and answer strategies
-        self._strategies = self.question_strategy._strategies
-        logger.info(f"Strategies: {self._strategies}")
-        self._load_question_templates()
-
-    def _load_question_templates(self):
-        self.question_templates = {}
-        for strategy in self._strategies:
-            self.question_templates[strategy] = self.question_strategy.templates[strategy]
-        self.merged_question_templates = list()
-        for strategy in self._strategies:
-            self.merged_question_templates.extend(self.question_templates[strategy])
-
-    def sample_strategy(self):
-        strategy = random.choice(self._strategies)
-        return strategy
+        self.question_evol = QuestionEvol()
+        self.answer_evol = AnswerEvol()
     
-    def evol_data(self, question_template, question: str, answer_output: str, refusal=True):
-        question_instance = question_template.format(question=question)
+    def evol_data(self, question, answer_output, refusal=True):
+        question_variants = self.question_evol.generate_prompt_variants(question, model_name="gpt-4o-mini")
         if refusal:
-            answer_instance = self.answer_strategy.safe_cot(question, answer_output)
+            answer_instance = self.answer_evol.safe_cot(question, answer_output)
         else:
-            answer_instance = self.answer_strategy.normal_cot(question, answer_output)
-        return question_instance, answer_instance
-  
-    def evol_dataset(self, dataset: list, refusal=True) -> list:
-        """Evolve an entire dataset of question-answer pairs"""
-
-        if len(self.merged_question_templates) < len(dataset):
-            logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(self.merged_question_templates)} templates are available.")
-            return []
-        # shuffle the questions
-        random.shuffle(self.merged_question_templates)
-
-        evolved_dataset = list()
-        for (question, output), question_template in zip(dataset, self.merged_question_templates):
-            question_instance, answer_instance = self.evol_data(question_template, question, output, refusal)
-            evolved_dataset.append({
-                "evolved_question": question_instance.strip(),
-                "evolved_answer": answer_instance.strip(),
-            })
-        return evolved_dataset
-
+            answer_instance = self.answer_evol.normal_cot(question, answer_output)
+        return question_variants, answer_instance
 
 #-------------------------Data Loading and Saving-------------------------
 # Adapt from https://raw.githubusercontent.com/GraySwanAI/circuit-breakers/refs/heads/main/data/circuit_breakers_val.json
@@ -150,45 +114,56 @@ def download_dolly():
     dump_json(evolved_dataset, processed_file_path)
     logger.info(f"Dolly dataset saved to {processed_file_path}")
 
+
 #-------------------------Data Processing-------------------------
-def process_circuitbreaker_dataset(train):
-    logger.info(f"Processing circuitbreaker {train} dataset...")
-    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
-    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_{"train" if train else "val"}.json')
+def process_circuitbreaker_train_dataset():
+    logger.info(f"Processing circuitbreaker train dataset...")
+    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_train.json')
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_train.json')
 
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
         dataset = json.load(f)
 
     data_evolver = DataEvolver()
-    question_templates = data_evolver.merged_question_templates
-    if len(question_templates) < len(dataset):
-        logger.error(f"Not enough templates for the dataset. Expected at least {len(dataset)} templates, but only {len(question_templates)} templates are available.")
-        return
-    else:
-        random.shuffle(question_templates)
-        question_templates = question_templates[:len(dataset)]
-    
     count = 0
-    merged_dataset = []
-    for data, question_template in tqdm(zip(dataset, question_templates), desc="Evolving dataset"):
+    for data in tqdm(dataset, desc="Evolving dataset"):
         question = data['prompt']
         refusal_output = data['llama3_output']
-        question_instance, answer_instance = data_evolver.evol_data(question_template, question, refusal_output, refusal=True)
-        new_data = {
-            "category": data['category'] if 'category' in data else "",
-            "question": question,
-            "refusal_output": refusal_output,
-            "output": data["output"],
-            "evolved_question": question_instance,
-            "evolved_answer": answer_instance
-        }
-        merged_dataset.append(new_data)
+        question_variants, answer_instance = data_evolver.evol_data(question, refusal_output, refusal=True)
+        data['evolved_variants'] = question_variants
+        data['evolved_answer'] = answer_instance
         count += 1
-        logger.info(f"Evolved {count} Question: {question_instance}")
+        logger.info(f"Evolved {count} Question Variants: {question_variants}")
         logger.info(f"Evolved {count} Answer: {answer_instance}")
     
-    dump_json(merged_dataset, processed_file_path)
+    dump_json(dataset, processed_file_path)
+    logger.info(f"Evolved train dataset saved to {processed_file_path}")
+
+
+def process_circuitbreaker_val_dataset():
+    logger.info(f"Processing circuitbreaker val dataset...")
+    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_val.json')
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_val.json')
+
+    # dataset keys: category, prompt, llama3_output
+    with open(raw_file_path, 'r') as f:
+        dataset = json.load(f)[:100]
+
+    data_evolver = DataEvolver()
+    count = 0
+    for data in tqdm(dataset, desc="Evolving dataset"):
+        question = data['prompt']
+        # refusal_output = data['llama3_output']
+        refusal_output = "I am sorry, I cannot answer that question."
+        question_variants, answer_instance = data_evolver.evol_data(question, refusal_output, refusal=True)
+        data['evolved_variants'] = question_variants
+        data['evolved_answer'] = answer_instance
+        count += 1
+        logger.info(f"Evolved {count} Question Variants: {question_variants}")
+        logger.info(f"Evolved {count} Answer: {answer_instance}")
+    
+    dump_json(dataset, processed_file_path)
     logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
 
@@ -206,14 +181,13 @@ def process_dolly():
         count += 1
         question = data['evolved_question']
         output = data['answer']
-        evolved_answer = data_evolver.answer_strategy.normal_cot(question=question, response=output)
+        evolved_answer = data_evolver.answer_evol.normal_cot(question=question, response=output, refusal=False)
         data['evolved_answer'] = evolved_answer
         
         logger.info(f"{count} Question: {question}")
         logger.info(f"Evolved {count} Answer: {evolved_answer}")
 
-    with open(processed_file_path, 'w') as f:
-        json.dump(dataset, f)
+    dump_json(dataset, processed_file_path)
     logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
 
 
@@ -240,11 +214,9 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
         data[model_name_or_path] = answer
     
     # Save processed dataset
-    with open(dataset_path, 'w') as f:
-        json.dump(dataset, f)
+    dump_json(dataset, dataset_path)
 
     logger.info(f"Dataset processed and saved to {dataset_path}")
-
 
 
 #TODO
@@ -268,16 +240,16 @@ def main():
     # download_circuitbreaker_dataset(train=True)
     # download_circuitbreaker_dataset(train=False)
 
-    # logger.info("Processing circuitbreaker dataset...")
-    # process_circuitbreaker_dataset(train=True) 
-    # process_circuitbreaker_dataset(train=False) 
+    logger.info("Processing circuitbreaker dataset...")
+    process_circuitbreaker_train_dataset() 
+    process_circuitbreaker_val_dataset() 
 
 
     # logger.info("Processing dolly dataset...")
     # download_dolly()
     # process_dolly()
     # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
     # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
 
 
