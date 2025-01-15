@@ -44,6 +44,8 @@ class HuggingFaceLLM(BaseLLM):
         if self.tokenizer.pad_token is None:
             self.tokenizer.add_special_tokens({"pad_token": "<pad>"})
         # Set padding side to left for decoder-only models
+            # Setting `pad_token_id` to `eos_token_id`:2 for open-end generation.
+            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
         self.tokenizer.padding_side = "left"
 
     def _load_model(self):
