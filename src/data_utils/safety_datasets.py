@@ -15,13 +15,11 @@ class SafetyReasoningDataset(Dataset):
                 model_name: str,         # 'llama3'
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
-                system_inst: str = None,
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.model_name = model_name
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.system_inst = system_inst
         self._load_data(dataset_name, split)
 
     def _load_data(self, dataset_name, split):
@@ -33,20 +31,19 @@ class SafetyReasoningDataset(Dataset):
         if split == 'val':
             circuitbreaker = circuitbreaker[:100]
     
-        self.dataset = list()
+        self.refusal_dataset = list()
         # original data with evolved question and answer
         for data in circuitbreaker:
-            question_variants = data['question_variants']
-            question = data['question']
+            question_variants = data['evolved_variants']
+            question = data['prompt']
             evolved_answer = data['evolved_answer']
-            self.dataset.append({
+            self.refusal_dataset.append({
                 "question_variants": question_variants,
                 "question": question,
                 "answer": evolved_answer
             })
-        random.shuffle(self.dataset)
-        print("dataset[0]", self.dataset[0])
-        print("dataset length:", len(self.dataset))
+        random.shuffle(self.refusal_dataset)
+        print("refusal_dataset length:", len(self.refusal_dataset))
             
         # ==========================  Retain ========================== #
         # dolly dataset
@@ -55,6 +52,7 @@ class SafetyReasoningDataset(Dataset):
             dolly = json.load(f)
         if split == 'val':
             dolly = dolly[:100]
+        
         self.retain_dataset = list()
         for data in dolly:
             question = data['evolved_question']
@@ -73,7 +71,6 @@ class SafetyReasoningDataset(Dataset):
 
         # shuffle the dataset
         random.shuffle(self.retain_dataset)
-        print("retain_dataset[0]", self.retain_dataset[0])
         print("retain_dataset length:", len(self.retain_dataset))
     
     def _format_data(self, question, answer):
@@ -107,16 +104,16 @@ class SafetyReasoningDataset(Dataset):
         labels[:encodings_wo_assistant.input_ids.shape[1]] = -100   
         model_inputs['labels'] = labels
 
-        return model_inputs
+        return model_inputs.copy()
 
     def __len__(self):
-        return min(len(self.dataset), len(self.retain_dataset))
+        return len(self.refusal_dataset)
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         # Get items from both datasets
-        refusal_example = self.dataset[i]  
+        refusal_example = self.refusal_dataset[i]  
         # Randomly select one variant from question_variants if available
-        variant_questions = [q for _, q in refusal_example['question_variants']]
+        variant_questions = [q for _, q in refusal_example['question_variants'].items()]
         variant_questions.append(refusal_example['question'])
         refusal_question = random.choice(variant_questions)
         refusal_answer = refusal_example['answer']
@@ -129,10 +126,14 @@ class SafetyReasoningDataset(Dataset):
         retain_answer = retain_example['answer']
         retain_inputs = self._format_data(retain_question, retain_answer)
 
-        model_inputs = {
-            "refusal_inputs": refusal_inputs,
-            "retain_inputs": retain_inputs
-        }
+        model_inputs = dict(
+            input_ids=refusal_inputs['input_ids'],
+            attention_mask=refusal_inputs['attention_mask'],
+            labels=refusal_inputs['labels'],
+            retain_input_ids=retain_inputs['input_ids'],
+            retain_attention_mask=retain_inputs['attention_mask'],
+            retain_labels=retain_inputs['labels']
+        )
         return model_inputs
     
 

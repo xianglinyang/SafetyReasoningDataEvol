@@ -1,10 +1,15 @@
 import torch
 from transformers import Trainer
 from tqdm import tqdm
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SafetyCoTTrainer(Trainer):
     def __init__(self, alpha, total_steps, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # incase
+        self.args.remove_unused_columns = False
         self.current_training_step = 0
         self.alpha = alpha
         self.total_steps = total_steps
@@ -12,14 +17,41 @@ class SafetyCoTTrainer(Trainer):
     def get_training_progress(self):
         return self.current_training_step / self.total_steps
     
+    def _prepare_inputs(self, inputs):
+        """
+        Prepares inputs for the model, ensuring both refusal and retain inputs are correctly formatted.
+        """
+        # Ensure inputs are on the correct device
+        device = self.args.device
+
+        # Prepare refusal inputs
+        refusal_inputs = {
+            'input_ids': inputs.get('input_ids').to(device),
+            'attention_mask': inputs.get('attention_mask').to(device),
+            'labels': inputs.get('labels').to(device)
+        }
+
+        # Prepare retain inputs
+        retain_inputs = {
+            'input_ids': inputs.get('retain_input_ids').to(device),
+            'attention_mask': inputs.get('retain_attention_mask').to(device),
+            'labels': inputs.get('retain_labels').to(device)
+        }
+
+        # Return a dictionary containing both refusal and retain inputs
+        return dict(
+            refusal_inputs=refusal_inputs,
+            retain_inputs=retain_inputs
+        )
+    
     def compute_loss(self, model, inputs, return_outputs=False):
         """
         Custom loss computation for both refusal and retain examples
         """
         self.current_training_step += 1
 
-        refusal_inputs = inputs["refusal_inputs"]
-        retain_inputs = inputs["retain_inputs"]
+        refusal_inputs = inputs['refusal_inputs']
+        retain_inputs = inputs['retain_inputs']
         
         # Calculate loss for refusal examples
         refusal_outputs = model(**refusal_inputs)
@@ -32,10 +64,12 @@ class SafetyCoTTrainer(Trainer):
         # coeff
         scheduled_coeff = self.get_training_progress()
         retain_coeff, refusal_coeff = self.alpha * scheduled_coeff, self.alpha * (1-scheduled_coeff)
-        total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
         print(f"retain_coeff: {retain_coeff:.4f} || refusal_coeff: {refusal_coeff:.4f}")
-        print(f"total_loss: {total_loss:.4f} || retain_loss: {retain_loss:.4f} || refusal_loss: {refusal_loss:.4f}")
-        
+        retain_coeff = retain_coeff if retain_coeff > 0 else 0
+        refusal_coeff = refusal_coeff if refusal_coeff > 0 else 0
+
+        total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
+        logger.info(f"total_loss: {total_loss:.4f} || retain_loss/weighted: {retain_loss:.4f} {retain_coeff*retain_loss:.4f} || refusal_loss/weighted: {refusal_loss:.4f} {refusal_coeff*refusal_loss:.4f}")
         if return_outputs:
             return (total_loss, {
                 "refusal_outputs": refusal_outputs,
@@ -43,7 +77,7 @@ class SafetyCoTTrainer(Trainer):
             })
         return total_loss
     
-    def training_step(self, model, inputs):
+    def training_step(self, model, inputs, num_items_in_batch=None):
         """
         Custom training step with potential safety-specific modifications
         """
@@ -74,8 +108,8 @@ class SafetyCoTTrainer(Trainer):
                 inputs = self._prepare_inputs(batch)
                 
                 # Get losses for both types of examples
-                refusal_outputs = model(**inputs["refusal_inputs"])
-                retain_outputs = model(**inputs["retain_inputs"])
+                refusal_outputs = model(**inputs['refusal_inputs'])
+                retain_outputs = model(**inputs['retain_inputs'])
                 
                 refusal_loss_sum += refusal_outputs.loss.item()
                 retain_loss_sum += retain_outputs.loss.item()
