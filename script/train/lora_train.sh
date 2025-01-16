@@ -3,7 +3,7 @@
 
 # ---------os env---------
 # Remove the CUDA_VISIBLE_DEVICES line since we want to use multiple GPUs
-# export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=1
 
 # ---------base arguments---------
 ID=$RANDOM
@@ -11,7 +11,7 @@ header="torchrun --nproc_per_node=1 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d
 
 base_arguments="\
 --ratio 0.5 \
---max_seq_length 2048 \
+--max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
 --lora_alpha 256 \
@@ -20,6 +20,7 @@ base_arguments="\
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
 --per_device_train_batch_size 2 \
+--per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
 --num_train_epochs 1 \
@@ -39,14 +40,15 @@ base_arguments="\
 --warmup_ratio 0.03 \
 --weight_decay 0.0 \
 --logging_steps 1 \
+--remove_unused_columns False
 "
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
-# model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
-# model_name_abbrs=("llama2-7b" "llama3-8b" "mistral-7b")
-model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "mistralai/Mistral-7B-Instruct-v0.2")
-model_name_abbrs=("llama2-7b" "mistral-7b")
+model_name_or_paths=("meta-llama/Llama-2-7b-chat-hf" "meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
+model_name_abbrs=("llama2-7b" "llama3-8b" "mistral-7b")
+# model_name_or_paths=("mistralai/Mistral-7B-Instruct-v0.2")
+# model_name_abbrs=("mistral-7b")
 
 out_dir="outputs"
 

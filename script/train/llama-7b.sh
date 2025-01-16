@@ -3,7 +3,7 @@
 
 # ---------os env---------
 # Remove the CUDA_VISIBLE_DEVICES line since we want to use multiple GPUs
-# export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=1
 
 # ---------base arguments---------
 ID=$RANDOM
@@ -11,7 +11,7 @@ header="torchrun --nproc_per_node=1 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d
 
 base_arguments="\
 --ratio 0.5 \
---max_seq_length 2048 \
+--max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
 --lora_alpha 256 \
@@ -20,9 +20,10 @@ base_arguments="\
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
 --per_device_train_batch_size 2 \
+--per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 0.2 \
+--num_train_epochs 1 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -39,6 +40,7 @@ base_arguments="\
 --warmup_ratio 0.03 \
 --weight_decay 0.0 \
 --logging_steps 1 \
+--remove_unused_columns False
 "
 
 # ---------dataset arguments---------
@@ -66,3 +68,4 @@ for dataset_name in ${dataset_names[@]}; do
 
     echo "$full_command"
     eval $full_command
+done
