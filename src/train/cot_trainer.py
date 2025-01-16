@@ -15,7 +15,8 @@ class SafetyCoTTrainer(Trainer):
         self.total_steps = total_steps
     
     def get_training_progress(self):
-        return self.current_training_step / self.total_steps
+        # return self.current_training_step / self.total_steps
+        return self.current_training_step / 300
     
     def _prepare_inputs(self, inputs):
         """
