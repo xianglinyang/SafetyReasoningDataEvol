@@ -15,48 +15,47 @@ class SafetyReasoningDataset(Dataset):
                 model_name: str,         # 'llama3'
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
-                ratio: float = 0.5,
                 system_inst: str = None,
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.model_name = model_name
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.ratio = ratio
         self.system_inst = system_inst
         self._load_data(dataset_name, split)
 
     def _load_data(self, dataset_name, split):
+        # ======================= Circuitbreaker ======================= #
         # circuitbreaker original data+ processed data
         data_path = f"data/processed/{dataset_name}_{split}.json"
         with open(data_path, 'r') as f:
             circuitbreaker = json.load(f)
-        # dolly dataset
-        data_path = f"data/processed/dolly.json"
-        with open(data_path, 'r') as f:
-            dolly = json.load(f)
-        
+        if split == 'val':
+            circuitbreaker = circuitbreaker[:100]
+    
         self.dataset = list()
         # original data with evolved question and answer
         for data in circuitbreaker:
-            evolved_question = data['evolved_question']
-            evolved_answer = data['evolved_answer']
-            self.dataset.append({
-                "question": evolved_question,
-                "answer": evolved_answer
-            })
-        # original data with original question and answer
-        for data in circuitbreaker:
+            question_variants = data['question_variants']
             question = data['question']
             evolved_answer = data['evolved_answer']
             self.dataset.append({
+                "question_variants": question_variants,
                 "question": question,
                 "answer": evolved_answer
             })
-
-        num = int(len(self.dataset) / self.ratio - len(self.dataset))
-        dolly = random.sample(dolly, num)
-
+        random.shuffle(self.dataset)
+        print("dataset[0]", self.dataset[0])
+        print("dataset length:", len(self.dataset))
+            
+        # ==========================  Retain ========================== #
+        # dolly dataset
+        data_path = f"data/processed/dolly_{split}.json"
+        with open(data_path, 'r') as f:
+            dolly = json.load(f)
+        if split == 'val':
+            dolly = dolly[:100]
+        self.retain_dataset = list()
         for data in dolly:
             question = data['evolved_question']
             answer = data['evolved_answer']
@@ -67,31 +66,23 @@ class SafetyReasoningDataset(Dataset):
             refusal_part = answer.split('#### Response')[0]
 
             new_answer = refusal_part+"#### Response\n"+output
-            self.dataset.append({
+            self.retain_dataset.append({
                 "question": question,
                 "answer": new_answer
             })
-        
+
         # shuffle the dataset
-        random.shuffle(self.dataset)
-
-    def __len__(self):
-        return len(self.dataset)
+        random.shuffle(self.retain_dataset)
+        print("retain_dataset[0]", self.retain_dataset[0])
+        print("retain_dataset length:", len(self.retain_dataset))
     
-    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        example = self.dataset[i]
-        
-        question = example['question']
-        answer = example['answer']
-
-        # format data
-        messages = list()
-        # if self.system_inst is not None:
-        #     messages.append({"role": "system", "content": self.system_inst})
-        messages.append({"role": "user", "content": question})
-        messages.append({"role": "assistant", "content": answer})
-
-        # encode the messages
+    def _format_data(self, question, answer):
+        # Format messages for refusal dataset and retain dataset
+        messages = [
+            {"role": "user", "content": question},
+            {"role": "assistant", "content": answer}
+        ]
+        # apply chat template
         formatted_text = self.tokenizer.apply_chat_template(messages, tokenize=False)
 
         # Tokenize with explicit padding and truncation
@@ -106,19 +97,42 @@ class SafetyReasoningDataset(Dataset):
             'input_ids': encodings['input_ids'][0],  # Remove batch dimension
             'attention_mask': encodings['attention_mask'][0]
         }
-        # Create labels (same as input_ids but with -100 for non-assistant tokens)
-        labels = encodings['input_ids'][0].clone()
 
-        # assistant_tokens_mask
+        # create labels
+        labels = encodings['input_ids'][0].clone()
         formatted_text_wo_assistant = self.tokenizer.apply_chat_template(messages[:-1], tokenize=False)
         encodings_wo_assistant = self.tokenizer(formatted_text_wo_assistant, 
                                                 return_tensors='pt', 
                                                 padding=False)
-
-        # mask the prompt part for avoiding loss
-        labels[:encodings_wo_assistant.input_ids.shape[1]] = -100    
-    
+        labels[:encodings_wo_assistant.input_ids.shape[1]] = -100   
         model_inputs['labels'] = labels
+
+        return model_inputs
+
+    def __len__(self):
+        return min(len(self.dataset), len(self.retain_dataset))
+
+    def __getitem__(self, i) -> Dict[str, torch.Tensor]:
+        # Get items from both datasets
+        refusal_example = self.dataset[i]  
+        # Randomly select one variant from question_variants if available
+        variant_questions = [q for _, q in refusal_example['question_variants']]
+        variant_questions.append(refusal_example['question'])
+        refusal_question = random.choice(variant_questions)
+        refusal_answer = refusal_example['answer']
+        # format data
+        refusal_inputs = self._format_data(refusal_question, refusal_answer)
+
+        # retain example
+        retain_example = self.retain_dataset[i]
+        retain_question = retain_example['question']
+        retain_answer = retain_example['answer']
+        retain_inputs = self._format_data(retain_question, retain_answer)
+
+        model_inputs = {
+            "refusal_inputs": refusal_inputs,
+            "retain_inputs": retain_inputs
+        }
         return model_inputs
     
 

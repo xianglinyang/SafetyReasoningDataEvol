@@ -10,16 +10,15 @@ import torch
 from transformers import (
     HfArgumentParser,
     set_seed,
-    Trainer,
     DataCollatorForSeq2Seq
 )
 
 from src.train.get_arguments import ModelArguments, DataArguments, TrainingArguments
+from src.train.cot_trainer import SafetyCoTTrainer
 from src.data_utils.safety_datasets import SafetyReasoningDataset
 from src.logger.config import setup_logging
 from src.logger.train_log import LoggingCallback
 from src.utils.train_utils import load_tokenizer_and_model, save_tokenizer_and_model
-from src.llm_zoo.model_configs import get_system_prompt
 
 
 logger = logging.getLogger(__name__)
@@ -52,9 +51,7 @@ def main():
         dataset_name=data_args.dataset_name,
         split="train",
         tokenizer=tokenizer,
-        ratio=data_args.ratio,
         max_length=data_args.max_seq_length,
-        # system_inst=get_system_prompt(model_args.model_name_or_path)
     )
     val_dataset = SafetyReasoningDataset(
         model_name=model_args.model_name_or_path,
@@ -62,11 +59,10 @@ def main():
         split="val",
         tokenizer=tokenizer,
         max_length=data_args.max_seq_length,
-        ratio=data_args.ratio,
-        # system_inst=get_system_prompt(model_args.model_name_or_path)
     )
-
-    trainer = Trainer(
+    
+    max_steps = (len(train_dataset) / (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)) * training_args.num_train_epochs
+    trainer = SafetyCoTTrainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
@@ -74,7 +70,9 @@ def main():
         tokenizer=tokenizer,
         data_collator=DataCollatorForSeq2Seq(
             tokenizer=tokenizer, model=model, padding="longest"),
-        callbacks=[LoggingCallback()]
+        callbacks=[LoggingCallback()],
+        alpha=0.5,
+        total_steps=max_steps
     )
     
     # Training
@@ -87,6 +85,7 @@ def main():
     # Cleanup distributed training
     if dist.is_initialized():
         dist.destroy_process_group()
+
 
 if __name__ == "__main__":
     # TODO: remove wandb
