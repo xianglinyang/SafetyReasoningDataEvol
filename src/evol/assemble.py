@@ -154,9 +154,8 @@ def process_circuitbreaker_val_dataset():
     count = 0
     for data in tqdm(dataset, desc="Evolving dataset"):
         question = data['prompt']
-        # refusal_output = data['llama3_output']
-        refusal_output = "I am sorry, I cannot answer that question."
-        question_variants, answer_instance = data_evolver.evol_data(question, refusal_output, refusal=True)
+        output = data['llama3_output']
+        question_variants, answer_instance = data_evolver.evol_data(question, output, refusal=False)
         data['evolved_variants'] = question_variants
         data['evolved_answer'] = answer_instance
         count += 1
@@ -186,8 +185,14 @@ def process_dolly():
         
         logger.info(f"{count} Question: {question}")
         logger.info(f"Evolved {count} Answer: {evolved_answer}")
+    
+    # randomly split it into train and val with ratio=8:2
+    random.shuffle(dataset)
+    train_dataset = dataset[:int(len(dataset) * 0.8)]
+    val_dataset = dataset[int(len(dataset) * 0.8):]
 
-    dump_json(dataset, processed_file_path)
+    dump_json(train_dataset, os.path.join(PROCESSED_DATA_DIR, f'dolly_train.json'))
+    dump_json(val_dataset, os.path.join(PROCESSED_DATA_DIR, f'dolly_val.json'))
     logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
 
 
@@ -241,7 +246,7 @@ def main():
     # download_circuitbreaker_dataset(train=False)
 
     logger.info("Processing circuitbreaker dataset...")
-    process_circuitbreaker_train_dataset() 
+    # process_circuitbreaker_train_dataset() 
     process_circuitbreaker_val_dataset() 
 
 
