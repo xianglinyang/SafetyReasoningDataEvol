@@ -37,8 +37,15 @@ class SafetyReasoningDataset(Dataset):
             question_variants = data['evolved_variants']
             question = data['prompt']
             evolved_answer = data['evolved_answer']
+
             self.refusal_dataset.append({
-                "question_variants": question_variants,
+                "question": question,
+                "answer": evolved_answer
+            })
+            # Randomly select one variant from question_variants if available
+            variant_questions = [q for _, q in question_variants.items()]
+            question = random.choice(variant_questions)
+            self.refusal_dataset.append({
                 "question": question,
                 "answer": evolved_answer
             })
@@ -111,17 +118,13 @@ class SafetyReasoningDataset(Dataset):
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
         # Get items from both datasets
-        refusal_example = self.refusal_dataset[i]  
-        # Randomly select one variant from question_variants if available
-        variant_questions = [q for _, q in refusal_example['question_variants'].items()]
-        variant_questions.append(refusal_example['question'])
-        refusal_question = random.choice(variant_questions)
+        refusal_example = self.refusal_dataset[i % len(self.refusal_dataset)]  
+        refusal_question = refusal_example['question']
         refusal_answer = refusal_example['answer']
-        # format data
         refusal_inputs = self._format_data(refusal_question, refusal_answer)
 
         # retain example
-        retain_example = self.retain_dataset[i]
+        retain_example = self.retain_dataset[i % len(self.retain_dataset)]
         retain_question = retain_example['question']
         retain_answer = retain_example['answer']
         retain_inputs = self._format_data(retain_question, retain_answer)
