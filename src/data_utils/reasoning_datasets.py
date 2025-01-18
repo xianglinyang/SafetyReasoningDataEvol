@@ -346,23 +346,55 @@ def answer_cleansing_with_regex(dataset, llm_answer):
     return answer
 
 
-def answer_cleansing_with_llm(dataset, llm_answer):
+def answer_cleansing_with_llm(dataset, question, answer):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
     # Currently, we use 4o-mini model to extract the answer from the reasoning output
     llm = OpenAILLM(model_name="gpt-4o-mini")
-    cleansing_prompt = f"""\
-    #### Instruction
-    You are a helpful and precise assistant. \
-    Your task is to extract the final answer from the given reasoning output. \
-    The answer should be concise and directly reflect the conclusion of the reasoning. If the reasoning does not contain a clear answer, return "[INVALID]".
+    # system_prompt = f"""\
+    # Extract the answer from a question and reasoning paragraph and clean the answer to extract the relevant information according to a provided standard, or return "[INVALID]" if there is no identifiable answer in the paragraph.
 
-    #### Reasoning Output
-    {llm_answer}
+    # # Steps
 
-    #### Extracted Answer
-    {zero_shot_answer_trigger(dataset)}
+    # 1. Analyze the question and reasoning paragraph.
+    # 2. Check if there is a valid answer present in the reasoning paragraph.
+    # 3. If a valid answer is present, clean the answer to extract the relevant information according to the provided standard.
+    # 4. If there is no valid answer, output "[INVALID]".
+
+    # # Output Format
+
+    # - If a valid answer is present, {zero_shot_answer_trigger(dataset)}.
+    # - If no valid answer is present, return "[INVALID]".
+
+    # # Notes
+
+    # - Ensure any cleaning requirements are consistently applied to all valid answers.
+    # - Consider edge cases where the answer is vague or irrelevant.
+    # """
+    # messages = [
+    #     {"role": "system", "content": system_prompt},
+    #     {"role": "user", "content": f"Question: {question}\nReasoning Paragraph: {answer}"}
+    # ]
+    # response = llm.invoke_messages(messages)
+    prompt = f"""\
+    You are a helpful assistant.
+    Your task is to extract the student's answer according to the provided standard from a question and reasoning paragraph, or return "[INVALID]" if there is no identifiable answer in the paragraph.
+    Your SHOULD {zero_shot_answer_trigger(dataset)}.
+    You MUST NOT solve the problem directly.
+
+    # Steps
+    
+    1. Analyze the question and reasoning paragraph.
+    2. Check if there is a valid answer present in the reasoning paragraph.
+    3. If a valid answer is present, clean the answer to extract the relevant information according to the provided standard.
+    4. If there is no valid answer, output "[INVALID]".
+
+    #### Input
+    Question: {question}
+    Reasoning Paragraph: {answer}
+
+    #### Output
     """
-    response = llm.invoke(cleansing_prompt)
+    response = llm.invoke(prompt)
     return response
 
 
@@ -377,17 +409,17 @@ def gt_answer_cleansing(dataset, answer):
 def zero_shot_answer_trigger(dataset):
     trigger = "The answer is"
     if dataset in ("aqua", "commonsenseqa"):
-        trigger = "You should return only ONE CHARACTER. Among A through E, the answer is "
+        trigger = "return only ONE CHARACTER (among A through E) as the answer"
     elif dataset == "mmlu":
-        trigger = "You should return only ONE CHARACTER. Among A through D, the answer is "
+        trigger = "return only ONE CHARACTER (among A through D) as the answer"
     elif dataset in("gsm8k", "multiarith", "svamp"):
-        trigger = "The answer (arabic numerals) is"
+        trigger = "return arabic numerals of the answer"
     elif dataset in ("strategyqa", "coin_flip"):
-        trigger = "The answer (Yes or No) is"
+        trigger = "return the answer (Yes or No)"
     elif dataset in ("bigbench_date"):
-        trigger = "You should return only ONE CHARACTER. Among A through F, the answer is "
+        trigger = "return only ONE CHARACTER (among A through F) as the answer"
     elif dataset in ("object_tracking"):
-        trigger = "You should return only ONE CHARACTER. Among A through C, the answer is " 
+        trigger = "return only ONE CHARACTER (among A through C) as the answer" 
     return trigger
 
             
