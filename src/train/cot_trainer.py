@@ -16,7 +16,7 @@ class SafetyCoTTrainer(Trainer):
     
     def get_training_progress(self):
         # return self.current_training_step / self.total_steps
-        return self.current_training_step / 150
+        return self.current_training_step / 1248*8
     
     def _prepare_inputs(self, inputs):
         """
@@ -64,12 +64,13 @@ class SafetyCoTTrainer(Trainer):
 
         # coeff
         scheduled_coeff = self.get_training_progress()
-        # retain_coeff, refusal_coeff = self.alpha * scheduled_coeff, self.alpha * (1-scheduled_coeff)
-        # retain_coeff, refusal_coeff = scheduled_coeff, 1-scheduled_coeff
-        # logger.info(f"retain_coeff: {retain_coeff:.4f} || refusal_coeff: {refusal_coeff:.4f}")
-        retain_coeff, refusal_coeff = 0.3, 0.7
-        # retain_coeff = retain_coeff if retain_coeff > 0 else 0
-        # refusal_coeff = refusal_coeff if refusal_coeff > 0 else 0
+        retain_coeff, refusal_coeff = scheduled_coeff+0.2, (1-scheduled_coeff)+0.2
+        logger.info(f"retain_coeff: {retain_coeff:.4f} || refusal_coeff: {refusal_coeff:.4f}")
+        
+        retain_coeff = retain_coeff if retain_coeff > 0.1 else 0.1
+        refusal_coeff = refusal_coeff if refusal_coeff > 0.1 else 0.1
+
+        # retain_coeff, refusal_coeff = 0.5, 0.5
 
         total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
         logger.info(f"total_loss: {total_loss:.4f} || retain_loss/weighted: {retain_loss:.4f} {retain_coeff*retain_loss:.4f} || refusal_loss/weighted: {refusal_loss:.4f} {refusal_coeff*refusal_loss:.4f}")

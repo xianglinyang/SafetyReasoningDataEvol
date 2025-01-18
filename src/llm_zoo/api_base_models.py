@@ -91,6 +91,14 @@ class OpenAILLM(BaseLLM):
                 **self.model_kwargs
             )
             return response.choices[0].text.strip()
+        
+    def invoke_messages(self, messages) -> str:
+        response = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            **self.model_kwargs
+        )
+        return response.choices[0].message.content
     
     async def ainvoke(self, prompt: str) -> str:
         assert self.model_name in self.CHAT_MODELS or self.model_name in self.INSTRUCT_MODELS, f"Unknown model: {self.model_name}. Must be one of {self.CHAT_MODELS + self.INSTRUCT_MODELS}"

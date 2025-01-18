@@ -30,21 +30,25 @@ from typing import Dict
 
 from src.logger.config import setup_logging
 from src.llm_zoo.code_base_models import HuggingFaceLLM
-from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing_with_llm, zero_shot_answer_trigger
+from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing_with_llm
 
 logger = logging.getLogger(__name__)
 
-def process_single_evaluation(llm, dataset_name, question, answer, idx):
+def process_single_evaluation(llm, dataset_name, question, gt_answer, idx):
     trigger = "Solve the following problem:\n\n"
     llm_answer = llm.invoke(trigger + question)
     
+    generated_answers = llm_answer.split("#### Response")
+    reasoning = generated_answers[0] if len(generated_answers) > 1 else ""
+    generated_answer = generated_answers[-1]
+    
     logger.info(f"{idx} Question: {question}")
-    logger.info(f"[GT answer]: {answer}")
-    logger.info(f"[LLM Answer]: {llm_answer}")
-    
-    pred_answer = answer_cleansing_with_llm(dataset_name, question+"\n\n"+llm_answer)
-    clean_answer = gt_answer_cleansing(dataset_name, answer)
-    
+    logger.info(f"[Reasoning]: {reasoning}")
+    logger.info(f"[LLM Answer]: {generated_answer}")
+
+    pred_answer = answer_cleansing_with_llm(dataset_name, question, generated_answer)
+    clean_answer = gt_answer_cleansing(dataset_name, gt_answer)
+    logger.info(f"[GT answer]: {clean_answer}")
     logger.info(f"[Pred answer]: {pred_answer}")
     logger.info(f"[Cleaning]: {clean_answer == pred_answer}")
     
@@ -185,7 +189,7 @@ def main():
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
     logger.info(f"Evaluation results: {results}")
-    # save_results(results)
+    save_results(results)
     print("End of evaluation")
 
 
