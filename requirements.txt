@@ -1,0 +1,9 @@
+datasets==3.1.0
+litellm==1.55.9
+numpy==2.2.1
+openai==1.58.1
+peft==0.13.2
+Requests==2.32.3
+torch==2.5.1
+tqdm==4.67.0
+transformers==4.46.2
