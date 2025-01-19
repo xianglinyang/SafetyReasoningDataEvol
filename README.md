@@ -15,6 +15,23 @@ bash script/evol/data_evol.sh
 ```bash
 bash script/train/lora_train.sh
 ```
+
+# Download
+1. install requirements.txt
+```bash
+pip install -r requirements.txt
+```
+
+2. login huggingface
+```bash
+huggingface-cli login
+```
+
+3. export OPENAI_API_KEY
+```bash
+export OPENAI_API_KEY="xxx"
+```
+
 # Evaluate instruction
 1. download HarmBench repo
 ```bash
