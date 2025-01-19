@@ -74,28 +74,6 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
 
     return sum(correct) / len(correct), time.time() - t0
 
-# def evaluate_reasoning_async(llm, dataset_name, dataset, eval_num=-1):
-#     # # For Jupyter notebooks
-#     # try:
-#     #     import nest_asyncio
-#     #     nest_asyncio.apply()
-#     # except ImportError:
-#     #     pass
-    
-#     # Create and run the event loop
-#     loop = asyncio.get_event_loop()
-#     if loop.is_closed():
-#         loop = asyncio.new_event_loop()
-#         asyncio.set_event_loop(loop)
-    
-#     try:
-#         correct, elapsed_time = loop.run_until_complete(
-#             evaluate_reasoning_async(llm, dataset_name, dataset, eval_num)
-#         )
-#         return sum(correct) / len(correct), elapsed_time
-#     finally:
-#         pass
-
 def save_results(results: Dict, path="eval_results"):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
@@ -186,7 +164,9 @@ def main():
         "model_name_or_path": model_name_or_path,
         "split": split,
         "eval_num": eval_num,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "elapsed_time": elapsed_time,
+        "average_time_per_sample": elapsed_time / eval_num
     }
     logger.info(f"Evaluation results: {results}")
     save_results(results)

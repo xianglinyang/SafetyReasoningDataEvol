@@ -243,25 +243,36 @@ def data_reader(dataset_name, split):
         else:
             raise TypeError(f"{dataset_name} does not have {split} splits.")
         
-        score_to_choices = lambda x: chr(ord('A')+x)
-        all_options = ['A', 'B', 'C', 'D']
+        # score_to_choices = lambda x: chr(ord('A')+x)
+        # all_options = ['A', 'B', 'C', 'D']
         
+        # for item in data:
+        #     question = item['question']
+        #     choices = item['choices']
+        #     answer = item['answer']
+
+        #     answer = score_to_choices(int(answer))
+
+        #     choice = "Answer Choices:"
+        #     for label, text in zip(all_options, choices):
+        #         choice += " ("
+        #         choice += label
+        #         choice += ") "
+        #         choice += text
+
+        #     questions.append(question.strip() + " " + choice)
+        #     answers.append(answer)
+        
+        # follow dolly format
         for item in data:
             question = item['question']
             choices = item['choices']
             answer = item['answer']
 
-            answer = score_to_choices(int(answer))
+            question = question + " " + ",".join(choices)
+            questions.append(question)
+            answers.append(choices[answer])
 
-            choice = "Answer Choices:"
-            for label, text in zip(all_options, choices):
-                choice += " ("
-                choice += label
-                choice += ") "
-                choice += text
-
-            questions.append(question.strip() + " " + choice)
-            answers.append(answer)
     
     elif dataset_name in ("coin_flip", "last_letters"):
       dataset_path = f"../dataset/{dataset_name}/{dataset_name}.json"
@@ -350,31 +361,7 @@ def answer_cleansing_with_llm(dataset, question, answer):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
     # Currently, we use 4o-mini model to extract the answer from the reasoning output
     llm = OpenAILLM(model_name="gpt-4o-mini")
-    # system_prompt = f"""\
-    # Extract the answer from a question and reasoning paragraph and clean the answer to extract the relevant information according to a provided standard, or return "[INVALID]" if there is no identifiable answer in the paragraph.
 
-    # # Steps
-
-    # 1. Analyze the question and reasoning paragraph.
-    # 2. Check if there is a valid answer present in the reasoning paragraph.
-    # 3. If a valid answer is present, clean the answer to extract the relevant information according to the provided standard.
-    # 4. If there is no valid answer, output "[INVALID]".
-
-    # # Output Format
-
-    # - If a valid answer is present, {zero_shot_answer_trigger(dataset)}.
-    # - If no valid answer is present, return "[INVALID]".
-
-    # # Notes
-
-    # - Ensure any cleaning requirements are consistently applied to all valid answers.
-    # - Consider edge cases where the answer is vague or irrelevant.
-    # """
-    # messages = [
-    #     {"role": "system", "content": system_prompt},
-    #     {"role": "user", "content": f"Question: {question}\nReasoning Paragraph: {answer}"}
-    # ]
-    # response = llm.invoke_messages(messages)
     prompt = f"""\
     You are a helpful assistant.
     Your task is to extract the student's answer according to the provided standard from a question and reasoning paragraph, or return "[INVALID]" if there is no identifiable answer in the paragraph.

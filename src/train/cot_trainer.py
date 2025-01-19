@@ -63,14 +63,14 @@ class SafetyCoTTrainer(Trainer):
         retain_loss = retain_outputs.loss
 
         # coeff
-        scheduled_coeff = self.get_training_progress()
-        retain_coeff, refusal_coeff = scheduled_coeff+0.2, (1-scheduled_coeff)+0.2
-        logger.info(f"retain_coeff: {retain_coeff:.4f} || refusal_coeff: {refusal_coeff:.4f}")
+        # scheduled_coeff = self.get_training_progress()
+        # retain_coeff, refusal_coeff = scheduled_coeff+0.2, (1-scheduled_coeff)+0.2
+        # logger.info(f"retain_coeff: {retain_coeff:.4f} || refusal_coeff: {refusal_coeff:.4f}")
         
-        retain_coeff = retain_coeff if retain_coeff > 0.1 else 0.1
-        refusal_coeff = refusal_coeff if refusal_coeff > 0.1 else 0.1
+        # retain_coeff = retain_coeff if retain_coeff > 0.1 else 0.1
+        # refusal_coeff = refusal_coeff if refusal_coeff > 0.1 else 0.1
 
-        # retain_coeff, refusal_coeff = 0.5, 0.5
+        retain_coeff, refusal_coeff = 0.5, 0.5
 
         total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
         logger.info(f"total_loss: {total_loss:.4f} || retain_loss/weighted: {retain_loss:.4f} {retain_coeff*retain_loss:.4f} || refusal_loss/weighted: {refusal_loss:.4f} {refusal_coeff*refusal_loss:.4f}")
@@ -138,3 +138,9 @@ class SafetyCoTTrainer(Trainer):
         }
         
         return metrics
+    
+    def save_model(self, output_dir: str, _internal_call: bool = False):
+        merged_model = self.model.merge_and_unload()
+
+        merged_model.save_pretrained(output_dir)
+        self.tokenizer.save_pretrained(output_dir)
