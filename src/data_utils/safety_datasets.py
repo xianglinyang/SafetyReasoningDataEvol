@@ -15,11 +15,13 @@ class SafetyReasoningDataset(Dataset):
                 model_name: str,         # 'llama3'
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
+                include_variants=True
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.model_name = model_name
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.include_variants = include_variants
         self._load_data(dataset_name, split)
 
     def _load_data(self, dataset_name, split):
@@ -42,13 +44,14 @@ class SafetyReasoningDataset(Dataset):
                 "question": question,
                 "answer": evolved_answer
             })
-            # Randomly select one variant from question_variants if available
-            variant_questions = [q for _, q in question_variants.items()]
-            question = random.choice(variant_questions)
-            self.refusal_dataset.append({
-                "question": question,
-                "answer": evolved_answer
-            })
+            if self.include_variants:   
+                # Randomly select one variant from question_variants if available
+                variant_questions = [q for _, q in question_variants.items()]
+                question = random.choice(variant_questions)
+                self.refusal_dataset.append({
+                    "question": question,
+                    "answer": evolved_answer
+                })
         random.shuffle(self.refusal_dataset)
         print("refusal_dataset length:", len(self.refusal_dataset))
             
