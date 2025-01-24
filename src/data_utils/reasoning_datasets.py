@@ -243,35 +243,35 @@ def data_reader(dataset_name, split):
         else:
             raise TypeError(f"{dataset_name} does not have {split} splits.")
         
-        # score_to_choices = lambda x: chr(ord('A')+x)
-        # all_options = ['A', 'B', 'C', 'D']
+        score_to_choices = lambda x: chr(ord('A')+x)
+        all_options = ['A', 'B', 'C', 'D']
         
-        # for item in data:
-        #     question = item['question']
-        #     choices = item['choices']
-        #     answer = item['answer']
-
-        #     answer = score_to_choices(int(answer))
-
-        #     choice = "Answer Choices:"
-        #     for label, text in zip(all_options, choices):
-        #         choice += " ("
-        #         choice += label
-        #         choice += ") "
-        #         choice += text
-
-        #     questions.append(question.strip() + " " + choice)
-        #     answers.append(answer)
-        
-        # follow dolly format
         for item in data:
             question = item['question']
             choices = item['choices']
             answer = item['answer']
 
-            question = question + " " + ",".join(choices)
-            questions.append(question)
-            answers.append(choices[answer])
+            answer = score_to_choices(int(answer))
+
+            choice = "Answer Choices:"
+            for label, text in zip(all_options, choices):
+                choice += " ("
+                choice += label
+                choice += ") "
+                choice += text
+
+            questions.append(question.strip() + " " + choice)
+            answers.append(answer)
+        
+        # # follow dolly format
+        # for item in data:
+        #     question = item['question']
+        #     choices = item['choices']
+        #     answer = item['answer']
+
+        #     question = question + " " + ",".join(choices)
+        #     questions.append(question)
+        #     answers.append(choices[answer])
 
     
     elif dataset_name in ("coin_flip", "last_letters"):
