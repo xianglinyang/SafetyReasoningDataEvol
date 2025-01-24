@@ -81,10 +81,11 @@ def data_reader(dataset_name, split):
             raise TypeError(f"{dataset_name} does not have {split} splits.")
         
         for item in data:
-            prompt = item['prompt']
-            behavior = item['behavior']
-            questions.append(prompt)
-            categories.append(behavior)
+            if item['subset'] == 'harmful':
+                prompt = item['prompt']
+                behavior = item['behavior']
+                questions.append(prompt)
+                categories.append(behavior)
 
     elif dataset_name == "harmbench":
         # standard, copyright, contextual
@@ -125,6 +126,7 @@ def data_reader(dataset_name, split):
         for item in data:
             prompt = item['prompt']
             questions.append(prompt)
+            
     elif dataset_name == "Malicious Instruct":
         dataset = load_dataset("walledai/MaliciousInstruct")
         if split == "train":
