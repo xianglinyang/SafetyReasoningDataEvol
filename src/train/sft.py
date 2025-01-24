@@ -52,6 +52,7 @@ def main():
         split="train",
         tokenizer=tokenizer,
         max_length=data_args.max_seq_length,
+        include_variants=data_args.include_variants
     )
     val_dataset = SafetyReasoningDataset(
         model_name=model_args.model_name_or_path,
@@ -59,6 +60,7 @@ def main():
         split="val",
         tokenizer=tokenizer,
         max_length=data_args.max_seq_length,
+        include_variants=data_args.include_variants
     )
     
     max_steps = (len(train_dataset) / (training_args.per_device_train_batch_size * training_args.gradient_accumulation_steps)) * training_args.num_train_epochs

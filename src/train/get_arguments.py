@@ -26,6 +26,12 @@ class DataArguments:
             "help": "The ratio of the dataset of harmful and helpful to use"
         }
     )
+    include_variants: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help": "Whether to include variants in the dataset"
+        }
+    )
 
 @dataclass
 class ModelArguments:
