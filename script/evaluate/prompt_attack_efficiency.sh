@@ -10,31 +10,27 @@ model_name_or_path_list=(
     "outputs/circuitbreaker/llama3-8b_20250121-122232/checkpoint-1248"
     # "outputs/circuitbreaker/llama3-8b_20250121-122232/"
     # "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-313"
-    # "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-624"
+    "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-624"
     # "outputs/circuitbreaker/mistral-7b_20250122-011012/"
-    # "meta-llama/Llama-3.1-8B-Instruct"
-    # "mistralai/Mistral-7B-Instruct-v0.2"
-    # "GraySwanAI/Llama-3-8B-Instruct-RR"
-    # "GraySwanAI/Mistral-7B-Instruct-RR"
-    # "cais/HarmBench-Mistral-7b-val-cls"
+    "meta-llama/Llama-3.1-8B-Instruct"
+    "mistralai/Mistral-7B-Instruct-v0.2"
+    "GraySwanAI/Llama-3-8B-Instruct-RR"
+    "GraySwanAI/Mistral-7B-Instruct-RR"
+    "cais/HarmBench-Mistral-7b-val-cls"
 
     # # Albation variants
     # "outputs/circuitbreaker/llama3-8b_ablation_variants/checkpoint-312"
-    # "outputs/circuitbreaker/mistral-7b_ablation_variants/checkpoint-312"
+    # "outputs/circuitbreaker/mistral-7b_ablation_variants/checkpoint-156"
 
-    # Ablation retain dataasets
+    # # Ablation retain dataasets
     # "outputs/circuitbreaker/llama3-8b_ablate_retain/checkpoint-624"
-    # "outputs/circuitbreaker/mistral-7b_ablation_retain/checkpoint-624"
+    # "outputs/circuitbreaker/mistral-7b_ablation_retain/checkpoint-312"
     
 )
 dataset_name_list=(
     # "sorrybench"
-    # "jailbreakbench"
+    "jailbreakbench"
     # "advbench"
-    "llama3-8b-AutoDAN"
-    # "mistral-7b-AutoDAN"
-    "llama3-8b-GCG"
-    # "mistral-7b-GCG"
 )
 attack_name_list=(
     "none"
@@ -49,14 +45,14 @@ attack_name_list=(
 #     "expert_endorsement"
 #     "slang"
 #     "evidence-based_persuasion")
+splits=(
+    "train")
 
-splits=("train")
-
-header="python -m src.evaluate.evaluate_harmful"
+header="python -m src.evaluate.evaluate_harmful_efficiency"
 base_arguments="\
 --device cuda \
 --torch_type bf16 \
---eval_num 100"
+--eval_num 10"
 # --split train \
 
 # Counter to distribute commands across GPUs
@@ -67,8 +63,7 @@ for split in ${splits[@]}; do
         for dataset_name in ${dataset_name_list[@]}; do
             for attack_name in ${attack_name_list[@]}; do
                 # Calculate GPU ID (0 or 1) and slot (0 or 1) for each command
-                # gpu_id=$((counter % gpu_num))
-                gpu_id=1
+                gpu_id=$((counter % gpu_num))
                 
                 # generate a random job id for each command
                 run_id=$RANDOM
