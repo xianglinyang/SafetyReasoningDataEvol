@@ -3,7 +3,7 @@
 
 # ---------os env---------
 # Remove the CUDA_VISIBLE_DEVICES line since we want to use multiple GPUs
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 # ---------base arguments---------
 ID=$RANDOM
@@ -14,7 +14,7 @@ base_arguments="\
 --max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
---lora_alpha 256 \
+--lora_alpha 128 \
 --lora_dropout 0.1 \
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
@@ -23,7 +23,7 @@ base_arguments="\
 --per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 1 \
+--num_train_epochs 3 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -33,7 +33,8 @@ base_arguments="\
 --do_eval True \
 --evaluation_strategy steps \
 --eval_steps 100 \
---save_strategy no \
+--save_strategy steps \
+--save_steps 500 \
 --metric_for_best_model loss \
 --greater_is_better False \
 --ddp_find_unused_parameters False \
