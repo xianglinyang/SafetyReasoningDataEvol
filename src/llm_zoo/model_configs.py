@@ -31,10 +31,13 @@ MISTRAL_ASSISTANT_TAG="[/INST]"
 MISTRAL_SEP_TOKEN = " "
 
 def get_system_prompt(model_name_or_path):
-    if "llama" in model_name_or_path.lower():
-        return LLAMA2_DEFAULT_SYSTEM_PROMPT
-    elif "mistral" in model_name_or_path.lower():
-        return MISTRAL_DEFAULT_SYSTEM_PROMPT
-    else:
-        logger.info(f"No system prompt found for model: {model_name_or_path}")
-        return None
+    return None
+    # if "llama" in model_name_or_path.lower():
+    #     return None
+    # #     return LLAMA2_DEFAULT_SYSTEM_PROMPT
+    # #     # return None
+    # # elif "mistral" in model_name_or_path.lower():
+    # #     return MISTRAL_DEFAULT_SYSTEM_PROMPT
+    # else:
+    #     logger.info(f"No system prompt found for model: {model_name_or_path}")
+    #     return None
