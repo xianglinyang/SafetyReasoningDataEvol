@@ -42,17 +42,12 @@ base_arguments="\
 --remove_unused_columns False
 --include_variants True
 "
-# --per_device_train_batch_size 1 \
-# --per_device_eval_batch_size 1 \
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
-# model_name_or_paths=("meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
-# model_name_abbrs=("llama3-8b" "mistral-7b")
-# per_device_train_batch_size=(1 2)
-model_name_or_paths=("mistralai/Mistral-7B-Instruct-v0.2")
-model_name_abbrs=("mistral-7b")
-per_device_train_batch_size=(1)
+model_name_or_paths=("meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
+model_name_abbrs=("llama3-8b" "mistral-7b")
+per_device_train_batch_size=(1 2)
 
 out_dir="outputs"
 

@@ -232,35 +232,30 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
 
 #-------------------------Main-------------------------
 def main():
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--run_id", '-r', type=int)
-    # args = parser.parse_args()
-    # run_id = args.run_id
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run_id", '-r', type=int)
+    args = parser.parse_args()
+    run_id = args.run_id
 
-    # setup_logging(task_name="data_evol", run_id=run_id)
-    setup_logging(task_name="data_evol", run_id=0)
-    # logger.info("Assembling data...")
+    setup_logging(task_name="data_evol", run_id=run_id)
+    logger.info("Assembling data...")
 
-    # logger.info("Downloading circuitbreaker dataset...")
-    # download_circuitbreaker_dataset(train=True)
-    # download_circuitbreaker_dataset(train=False)
+    logger.info("Downloading circuitbreaker dataset...")
+    download_circuitbreaker_dataset(train=True)
+    download_circuitbreaker_dataset(train=False)
 
     logger.info("Processing circuitbreaker dataset...")
-    # process_circuitbreaker_train_dataset() 
+    process_circuitbreaker_train_dataset() 
     process_circuitbreaker_val_dataset() 
 
 
-    # logger.info("Processing dolly dataset...")
-    # download_dolly()
-    # process_dolly()
-    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    logger.info("Processing dolly dataset...")
+    download_dolly()
+    process_dolly()
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
 
 
-if __name__ == "__main__":
-    # import os
-    # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-    
+if __name__ == "__main__":    
     main()
