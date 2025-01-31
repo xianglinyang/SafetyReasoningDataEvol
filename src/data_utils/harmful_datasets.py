@@ -68,7 +68,7 @@ sorrybench_categories = [
 ]
 
 def data_reader(dataset_name, split):
-    assert dataset_name in __datasets__, f"{dataset_name} is not supported yet"
+    # assert dataset_name in __datasets__, f"{dataset_name} is not supported yet"
 
     questions = list()
     categories = list()
@@ -103,19 +103,14 @@ def data_reader(dataset_name, split):
 
     elif dataset_name == "sorrybench":
         dataset = load_dataset("sorry-bench/sorry-bench-202406")
-        if split == "train":
-            data = dataset['train']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
-        
+        assert split in ["logical_appeal","uncommon_dialects","role_play","expert_endorsement","slang","evidence-based_persuasion"]
+        # find misspelling
+        data = [item for item in dataset['train'] if item['prompt_style'] == split]
         for item in data:
-            prompt_style = item['prompt_style']
-            # current only support base style, other styles are linguistic mutations
-            if prompt_style == "base":
-                prompt = item['turns'][0]
-                category = sorrybench_categories[int(item['category'])-1]
-                questions.append(prompt)
-                categories.append(category)
+            prompt = item['turns'][0]
+            category = sorrybench_categories[int(item['category'])-1]
+            questions.append(prompt)
+            categories.append(category)
 
     elif dataset_name == "advbench":
         dataset = load_dataset("walledai/AdvBench")
@@ -147,6 +142,30 @@ def data_reader(dataset_name, split):
         for item in data:
             prompt = item["prompt"]
             questions.append(prompt)
+    elif dataset_name == "llama3-8b-GCG":
+        path = "/home/xianglin/git_space/HarmBench/test_cases/GCG/llama3-8b/test_cases.json"
+        with open(path, 'r') as f:
+            data = json.load(f)
+        for key, value in data.items():
+            questions.append(value[0])
+    elif dataset_name == "llama3-8b-AutoDAN":
+        path = "/home/xianglin/git_space/HarmBench/test_cases/AutoDAN/llama3-8b/test_cases.json"
+        with open(path, 'r') as f:
+            data = json.load(f)
+        for key, value in data.items():
+            questions.append(value[0])
+    elif dataset_name == "mistral-7b-AutoDAN":
+        path = "/home/xianglin/git_space/HarmBench/test_cases/AutoDAN/mistral-7b/test_cases.json"
+        with open(path, 'r') as f:
+            data = json.load(f)
+        for key, value in data.items():
+            questions.append(value[0])
+    elif dataset_name == "mistral-7b-GCG":
+        path = "/home/xianglin/git_space/HarmBench/test_cases/GCG/mistral-7b/test_cases.json"
+        with open(path, 'r') as f:
+            data = json.load(f)
+        for key, value in data.items():
+            questions.append(value[0])
 
     return questions, categories
 
