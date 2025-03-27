@@ -17,6 +17,7 @@ __datasets__ = [
     "advbench",
     "Malicious Instruct",
     "circuitbreaker"
+    "renellm"
 ]
 
 sorrybench_categories = [
@@ -142,6 +143,14 @@ def data_reader(dataset_name, split):
         for item in data:
             prompt = item["prompt"]
             questions.append(prompt)
+    elif dataset_name == "renellm":
+        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        dataset = load_dataset("Deep1994/ReNeLLM-Jailbreak")
+        data = dataset['train']
+        for item in data:
+            prompt = item['nested_prompt']
+            questions.append(prompt)
+            
     elif dataset_name == "llama3-8b-GCG":
         path = "/home/xianglin/git_space/HarmBench/test_cases/GCG/llama3-8b/test_cases.json"
         with open(path, 'r') as f:
