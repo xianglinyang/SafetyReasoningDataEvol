@@ -38,7 +38,7 @@ class SafetyReasoningDataset(Dataset):
         for data in circuitbreaker:
             question_variants = data['evolved_variants']
             question = data['prompt']
-            evolved_answer = data['evolved_answer']
+            evolved_answer = data['evolved_answer_modified']
 
             self.refusal_dataset.append({
                 "question": question,
@@ -66,7 +66,7 @@ class SafetyReasoningDataset(Dataset):
         self.retain_dataset = list()
         for data in dolly:
             question = data['evolved_question']
-            answer = data['evolved_answer']
+            answer = data['evolved_answer_modified']
             # clean format
             output = data[self.model_name]
             if output.startswith('assistant\n\n'):

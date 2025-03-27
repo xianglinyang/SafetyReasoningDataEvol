@@ -62,14 +62,6 @@ class SafetyCoTTrainer(Trainer):
         retain_outputs = model(**retain_inputs)
         retain_loss = retain_outputs.loss
 
-        # coeff
-        # scheduled_coeff = self.get_training_progress()
-        # retain_coeff, refusal_coeff = scheduled_coeff+0.2, (1-scheduled_coeff)+0.2
-        # logger.info(f"retain_coeff: {retain_coeff:.4f} || refusal_coeff: {refusal_coeff:.4f}")
-        
-        # retain_coeff = retain_coeff if retain_coeff > 0.1 else 0.1
-        # refusal_coeff = refusal_coeff if refusal_coeff > 0.1 else 0.1
-
         retain_coeff, refusal_coeff = 0.5, 0.5
 
         total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss

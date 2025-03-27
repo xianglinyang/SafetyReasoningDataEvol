@@ -7,7 +7,7 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=1 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
 --ratio 0.5 \
@@ -19,8 +19,8 @@ base_arguments="\
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
---per_device_train_batch_size 2 \
---per_device_eval_batch_size 2 \
+--per_device_train_batch_size 1 \
+--per_device_eval_batch_size 1 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
 --num_train_epochs 1 \
@@ -48,7 +48,7 @@ dataset_names=("circuitbreaker")
 model_name_or_path="meta-llama/Llama-3.1-8B-Instruct"
 model_name_abbr="llama3-8b"
 
-out_dir="outputs"
+out_dir="/data2/xianglin/SCoT/outputs"
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do
