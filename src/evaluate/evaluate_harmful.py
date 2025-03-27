@@ -29,6 +29,7 @@ from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.llm_zoo.api_base_models import OpenAILLM
 from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
+from src.evaluate.direct_prompts import sbs_ins, sof_ins, c_ins
 # from src.evaluate.adv_attack import __adv_attacks__
 
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ class LlamaGuard3Classifier:
         self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL)
         self._tokenizer.pad_token = self._tokenizer.eos_token
         self._tokenizer.padding_side = "left"
-        self._model = AutoModelForCausalLM.from_pretrained(self.MODEL).to(device)
+        self._model = AutoModelForCausalLM.from_pretrained(self.MODEL, torch_dtype=torch.bfloat16).to(device)
         self.UNSAFE_TOKEN_ID = self._tokenizer.convert_tokens_to_ids("unsafe")
         self._device = device
     
@@ -153,7 +154,7 @@ def llamaguard3_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
 # ------------------------------------utils------------------------------------
 ##############################################################################################
 
-def get_completions(llm, dataset, attack_name, eval_num=-1):
+def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0):
     logger.info(f"Getting completions for {attack_name} attack")
     attack_questions = []
     questions = []
@@ -174,7 +175,10 @@ def get_completions(llm, dataset, attack_name, eval_num=-1):
     for idx in tqdm(eval_idxs):
         question, category = dataset[idx]
         attack_question = attack_fn(question)
+        if direct_prompting:
+            attack_question = sbs_ins.format(question=attack_question)
         llm_answer = llm.invoke(attack_question)
+
         answer = llm_answer.split("#### Response")[-1].strip()
         attack_questions.append(attack_question)
         questions.append(question)
@@ -281,6 +285,7 @@ def main():
     parser.add_argument("--eval_num", type=int, default=-1)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--attack_name", type=str)
+    parser.add_argument("--prompt_cot", type=int, default=0)    # baseline: direct prompting with safe CoT
     parser.add_argument("--run_id", type=str, help="Unique identifier for this run for logging")
     args = parser.parse_args()
 
@@ -294,6 +299,7 @@ def main():
     eval_num = args.eval_num
     device = args.device
     attack_name = args.attack_name
+    direct_prompting = args.prompt_cot
 
     torch_type = args.torch_type
     if torch_type == "bf16":
@@ -307,7 +313,7 @@ def main():
 
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = HarmfulDataset(dataset_name=dataset_name, split=split)
-    attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num)
+    attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num, direct_prompting)
     # release gpu memory
     del llm
     torch.cuda.empty_cache()
