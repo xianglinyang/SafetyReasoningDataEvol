@@ -15,13 +15,15 @@ class SafetyReasoningDataset(Dataset):
                 model_name: str,         # 'llama3'
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
-                include_variants=True
+                include_variants=True,
+                include_reasoning=True
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.model_name = model_name
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.include_variants = include_variants
+        self.include_reasoning = include_reasoning
         self._load_data(dataset_name, split)
 
     def _load_data(self, dataset_name, split):
@@ -38,19 +40,20 @@ class SafetyReasoningDataset(Dataset):
         for data in circuitbreaker:
             question_variants = data['evolved_variants']
             question = data['prompt']
-            evolved_answer = data['evolved_answer_modified']
+            answer = data['evolved_answer'] if self.include_reasoning else data['llama3_output']
 
             self.refusal_dataset.append({
                 "question": question,
-                "answer": evolved_answer
+                "answer": answer
             })
+
             if self.include_variants:   
                 # Randomly select one variant from question_variants if available
                 variant_questions = [q for _, q in question_variants.items()]
                 question = random.choice(variant_questions)
                 self.refusal_dataset.append({
                     "question": question,
-                    "answer": evolved_answer
+                    "answer": answer
                 })
         random.shuffle(self.refusal_dataset)
         print("refusal_dataset length:", len(self.refusal_dataset))
@@ -67,13 +70,17 @@ class SafetyReasoningDataset(Dataset):
         for data in dolly:
             question = data['evolved_question']
             answer = data['evolved_answer_modified']
-            # clean format
-            output = data[self.model_name]
-            if output.startswith('assistant\n\n'):
-                output = output[10:]
-            refusal_part = answer.split('#### Response')[0]
+            if self.include_reasoning:
+                # clean format
+                output = data[self.model_name]
+                if output.startswith('assistant\n\n'):
+                    output = output[10:]
+                refusal_part = answer.split('#### Response')[0]
 
-            new_answer = refusal_part+"#### Response\n"+output
+                new_answer = refusal_part+"#### Response\n"+output
+            else:
+                new_answer = data[self.model_name]
+
             self.retain_dataset.append({
                 "question": question,
                 "answer": new_answer
