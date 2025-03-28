@@ -40,3 +40,13 @@ First, identify any potential safety concerns or policy violations (like promoti
 Then, explain your reasoning.
 Finally, tell me if you have to refuse because of those concerns, and if so, give the refusal. If there are no concerns, give the answer. Please show me your thinking process.
 """
+
+def get_direct_prompting_fn(prompt_type: int):
+    if prompt_type == 1:
+        return sbs_ins
+    elif prompt_type == 2:
+        return sof_ins
+    elif prompt_type == 3:
+        return c_ins
+    else:
+        raise ValueError(f"Invalid prompt type: {prompt_type}")

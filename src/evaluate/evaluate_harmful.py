@@ -29,7 +29,7 @@ from src.data_utils.harmful_datasets import HarmfulDataset
 from src.llm_zoo.code_base_models import HuggingFaceLLM
 from src.llm_zoo.api_base_models import OpenAILLM
 from src.evaluate.prompt_attack import get_attack_fn, __prompt_attacks_methods__
-from src.evaluate.direct_prompts import sbs_ins, sof_ins, c_ins
+from src.evaluate.direct_prompts import get_direct_prompting_fn
 # from src.evaluate.adv_attack import __adv_attacks__
 
 logger = logging.getLogger(__name__)
@@ -175,8 +175,10 @@ def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0):
     for idx in tqdm(eval_idxs):
         question, category = dataset[idx]
         attack_question = attack_fn(question)
+        
         if direct_prompting:
-            attack_question = sbs_ins.format(question=attack_question)
+            ins = get_direct_prompting_fn(direct_prompting)
+            attack_question = ins.format(question=attack_question)
         llm_answer = llm.invoke(attack_question)
 
         answer = llm_answer.split("#### Response")[-1].strip()
@@ -325,6 +327,7 @@ def main():
         "dataset_name": dataset_name,
         "attack_name": attack_name,
         "eval_num": eval_num,
+        "direct_prompting": direct_prompting,
         "split": split,
         "attack_type": "prompt" if attack_name in __prompt_attacks_methods__ else "adv",
         "evaluation": evaluation,
