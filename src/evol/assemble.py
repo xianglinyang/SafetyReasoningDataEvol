@@ -126,18 +126,23 @@ def process_circuitbreaker_train_dataset():
         dataset = json.load(f)
 
     data_evolver = DataEvolver()
+    new_dataset = []
     count = 0
     for data in tqdm(dataset, desc="Evolving dataset"):
         question = data['prompt']
         refusal_output = data['llama3_output']
         question_variants, answer_instance = data_evolver.evol_data(question, refusal_output, refusal=True)
+
+        if answer_instance is None:
+            continue
         data['evolved_variants'] = question_variants
         data['evolved_answer'] = answer_instance
         count += 1
+        new_dataset.append(data)
         logger.info(f"Evolved {count} Question Variants: {question_variants}")
         logger.info(f"Evolved {count} Answer: {answer_instance}")
     
-    dump_json(dataset, processed_file_path)
+    dump_json(new_dataset, processed_file_path)
     logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
 
@@ -151,18 +156,22 @@ def process_circuitbreaker_val_dataset():
         dataset = json.load(f)[:100]
 
     data_evolver = DataEvolver()
+    new_dataset = []
     count = 0
     for data in tqdm(dataset, desc="Evolving dataset"):
         question = data['prompt']
         output = data['llama3_output']
         question_variants, answer_instance = data_evolver.evol_data(question, output, refusal=False)
+        if answer_instance is None:
+            continue
         data['evolved_variants'] = question_variants
         data['evolved_answer'] = answer_instance
         count += 1
         logger.info(f"Evolved {count} Question Variants: {question_variants}")
         logger.info(f"Evolved {count} Answer: {answer_instance}")
+        new_dataset.append(data)
     
-    dump_json(dataset, processed_file_path)
+    dump_json(new_dataset, processed_file_path)
     logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
 
@@ -174,22 +183,25 @@ def process_dolly():
         dataset = json.load(f)
     
     data_evolver = DataEvolver()
+    new_dataset = []
     count = 0
     
     for data in tqdm(dataset, desc="Evolving Dolly dataset"):
-        count += 1
         question = data['evolved_question']
         output = data['answer']
         evolved_answer = data_evolver.answer_evol.normal_cot(question=question, response=output, refusal=False)
+        if evolved_answer is None:
+            continue
         data['evolved_answer'] = evolved_answer
-        
+        new_dataset.append(data)
+        count += 1
         logger.info(f"{count} Question: {question}")
         logger.info(f"Evolved {count} Answer: {evolved_answer}")
     
     # randomly split it into train and val with ratio=8:2
-    random.shuffle(dataset)
-    train_dataset = dataset[:int(len(dataset) * 0.8)]
-    val_dataset = dataset[int(len(dataset) * 0.8):]
+    random.shuffle(new_dataset)
+    train_dataset = new_dataset[:int(len(new_dataset) * 0.8)]
+    val_dataset = new_dataset[int(len(new_dataset) * 0.8):]
 
     dump_json(train_dataset, os.path.join(PROCESSED_DATA_DIR, f'dolly_train.json'))
     dump_json(val_dataset, os.path.join(PROCESSED_DATA_DIR, f'dolly_val.json'))
@@ -224,7 +236,7 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
     logger.info(f"Dataset processed and saved to {dataset_path}")
 
 
-#TODO
+# TODO
 # open instruction dataset
 # open assistant dataset
 # cot dataset
@@ -232,29 +244,31 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
 
 #-------------------------Main-------------------------
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--run_id", '-r', type=int)
-    args = parser.parse_args()
-    run_id = args.run_id
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--run_id", '-r', type=int)
+    # args = parser.parse_args()
+    # run_id = args.run_id
 
-    setup_logging(task_name="data_evol", run_id=run_id)
-    logger.info("Assembling data...")
+    # setup_logging(task_name="data_evol", run_id=run_id)
+    # logger.info("Assembling data...")
 
-    logger.info("Downloading circuitbreaker dataset...")
-    download_circuitbreaker_dataset(train=True)
-    download_circuitbreaker_dataset(train=False)
+    # logger.info("Downloading circuitbreaker dataset...")
+    # download_circuitbreaker_dataset(train=True)
+    # download_circuitbreaker_dataset(train=False)
 
-    logger.info("Processing circuitbreaker dataset...")
-    process_circuitbreaker_train_dataset() 
-    process_circuitbreaker_val_dataset() 
+    # logger.info("Processing circuitbreaker dataset...")
+    # process_circuitbreaker_train_dataset() 
+    # process_circuitbreaker_val_dataset() 
 
+    # logger.info("Processing dolly dataset...")
+    # download_dolly()
+    # process_dolly()
 
-    logger.info("Processing dolly dataset...")
-    download_dolly()
-    process_dolly()
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # logger.info("Processing instruction following dataset...")
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:1", batch_size=4, max_new_tokens=2048)
 
 
 if __name__ == "__main__":    

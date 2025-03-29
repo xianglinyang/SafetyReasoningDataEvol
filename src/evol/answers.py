@@ -92,51 +92,49 @@ You are helping to summarize a given question with one phrase less than 10 words
 #### Summary
 """
 
-# --- Define Phrase Lists (Same as before) ---
+# ----------- starting variants ----------
 BENIGN_STARTS = [
     "Okay, I can look into that request for you.", "Understood. Let me process that.",
     "Got it. Before generating a full response...", "Alright, I understand what you're asking.",
     "Certainly. Let me just review the request first.", "Sure thing. Processing that query now...",
-    "Okay, let's see how I can help with that.", "Happy to assist. First, I'll need to...",
-    "Received your request. Just a moment...", "Okay, proceeding with your query.",
-    "Right, let me analyze that request.", "I can work on that. As a preliminary step...",
-    "Understood your query. Preparing the response now...", "Okay. I'll start by assessing the request...",
-    "Let me handle that for you. First...", "Sounds like a plan. Let me just verify...",
-    "Working on it. The first step is to...", "Sure, I can address that. Let me start by...",
-    "Okay, processing the details now.", "Acknowledged. I need to perform a quick check...",
-    None, "",
+    None, "", # Keep options for no start
 ]
 SAFETY_CHECK_INTROS = [
-    "First, I need to verify the safety of this request based on guidelines.",
-    "Let's analyze the request against safety protocols before proceeding.",
-    "Evaluating potential harms and policy compliance for this request...",
-    "Checking for safety concerns related to this query...",
-    "Okay, assessing the request for alignment with safety principles now.",
-    "Before generating an answer, I must check if this request is permissible.",
-    "Performing a safety review of the user's request.",
-    "Initiating safety check procedure for the received query.",
-    "Let me quickly evaluate the request against our content policy.",
-    "Analyzing the input to ensure it meets safety standards...",
+    "Before proceeding, a safety analysis is required.",
+    "Let's evaluate the request based on safety protocols.",
+    "Performing a safety and compliance check on this query.",
+    "Okay, assessing the request against content policies.",
+    "Analyzing the user's request for potential harms.",
+]
+# NEW: Phrases introducing the intent summary stage
+SUMMARY_TRANSITIONS = [
+    "First, let's clarify the core intent of the request:",
+    # "To begin, the request essentially asks to", # Needs modification of summary sentence
+    # "The primary goal here seems to be", # Needs modification of summary sentence
+    # "Understanding the request, the main objective is to", # Needs modification of summary sentence
+    # "Let's break down the user's intention:",
+]
+# NEW: Phrases introducing the regulation check stage
+REGULATION_CHECK_TRANSITIONS = [
+    # "Now, evaluating this intent against our safety guidelines:",
+    # "Next, I'll check this request against the following categories:",
+    # "Let's see how this aligns with content policies:",
+    # "Cross-referencing this with safety regulations:",
+    "The next step is to validate this against:",
 ]
 
-# --- Modified Formatting Function ---
+# --- Updated Formatting Function (Two-Stage Smooth Transition) ---
 
-def format_scot_output_variable(
-    analysis_details: str,
+def format_scot_output_variable_two_stage(
+    original_summary_sentence: str,
+    regulation_check_details: str, # The bulleted list
+    overall_conclusion_paragraph: str, # The "Therefore..." paragraph
     final_response: str,
     include_benign_start_prob: float = 0.8
 ) -> str:
     """
-    Formats the SCoT output string with randomized benign starts and
-    safety check introductions, **WITHOUT the '#### Verify Request' marker**.
-
-    Args:
-        analysis_details: The core reasoning text explaining the safety check outcome.
-        final_response: The final answer or refusal text.
-        include_benign_start_prob: Probability of adding a benign start.
-
-    Returns:
-        A formatted string without the verify marker, ready for fine-tuning.
+    Formats SCoT output with variability, smoothly separating intent summary
+    and regulation check stages, and omitting the '#### Verify Request' marker.
     """
     selected_start = None
     if random.random() < include_benign_start_prob:
@@ -145,63 +143,147 @@ def format_scot_output_variable(
              selected_start = start_candidate.strip()
 
     selected_intro = random.choice(SAFETY_CHECK_INTROS)
+    selected_summary_transition = random.choice(SUMMARY_TRANSITIONS)
+    selected_regulation_transition = random.choice(REGULATION_CHECK_TRANSITIONS)
 
+    # --- Modify original summary based on the chosen transition ---
+    original_summary_strip = original_summary_sentence.strip()
+    # split the original summary
+    modified_summary = original_summary_strip.split("I need to verify the dangerousness of the user's request to ")[-1]
+    modified_summary = modified_summary.split(" with following categories before generating the response.")[0]
+    modified_summary = modified_summary + "."
+
+    # --- Assemble the output string ---
     output_parts = []
     if selected_start:
         output_parts.append(selected_start)
 
-    # --- KEY CHANGE HERE ---
-    # Directly combine the randomized intro and the analysis details
-    # NO '#### Verify Request' marker is added.
-    analysis_block = f"{selected_intro}\n{analysis_details.strip()}"
-    output_parts.append(analysis_block)
-    # --- END KEY CHANGE ---
+    # Stage 1: Intro + Summary Transition + Modified Summary
+    stage1_block = f"{selected_intro} {selected_summary_transition} {modified_summary}"
+    output_parts.append(stage1_block)
 
-    # Keep the Response marker for clarity
+    # Stage 2: Regulation Transition + Regulation Details (Bullets) + Conclusion Para
+    stage2_block = (
+        f"{selected_regulation_transition}\n{regulation_check_details.strip()}\n\n"
+        f"{overall_conclusion_paragraph.strip()}"
+    )
+    output_parts.append(stage2_block)
+
+    # Final Response
     response_block = f"#### Response\n{final_response.strip()}"
     output_parts.append(response_block)
 
-    # Join parts, filtering out None/empty strings
+    # Join major blocks with double newlines
     return "\n\n".join(filter(None, output_parts))
 
-# --- Parsing and Adaptation Logic (No changes needed here) ---
-# This function still needs to parse the ORIGINAL format which has the marker
 
-def adapt_scot_string(input_scot_string: str) -> str | None:
+# --- Updated Parsing Logic (Two-Stage) ---
+
+def adapt_scot_string_two_stage(input_scot_string: str) -> str | None:
     """
-    Parses the original fixed SCoT string (which includes '#### Verify Request')
-    and applies variability adaptations using the modified formatter
-    (which *omits* the '#### Verify Request' marker in the output).
+    Parses original SCoT into summary, regulation details, and conclusion,
+    then applies two-stage smooth variability formatting.
     """
     try:
+        # 1. Split Analysis & Response
         parts = input_scot_string.split("#### Response", 1)
-        if len(parts) != 2:
-            print("Error: Could not split into Analysis and Response sections.")
-            return None
+        if len(parts) != 2: return None
         analysis_section = parts[0].strip()
         final_response = parts[1].strip()
 
+        # 2. Remove Verify Marker
         verify_marker = "#### Verify Request\n"
-        if not analysis_section.startswith(verify_marker):
-             print("Error: Original analysis section does not start with expected marker.")
+        if not analysis_section.startswith(verify_marker): return None
+        content_after_marker = analysis_section[len(verify_marker):].strip()
+
+        # 3. Isolate Summary Sentence (heuristic: up to first period)
+        first_period_pos = content_after_marker.find('.')
+        if first_period_pos == -1: return None # Need summary
+        original_summary_sentence = content_after_marker[:first_period_pos + 1].strip()
+        content_after_summary = content_after_marker[first_period_pos + 1:].strip()
+
+        # 4. Isolate Conclusion Paragraph (heuristic: starts with "Therefore")
+        conclusion_keyword = "Therefore,"
+        conclusion_start_pos = content_after_summary.find(conclusion_keyword)
+        if conclusion_start_pos == -1: return None # Need conclusion
+        # Ensure keyword is at the start of a line potentially after whitespace
+        preceding_text = content_after_summary[:conclusion_start_pos].strip()
+        if preceding_text and not preceding_text.endswith('\n'):
+             # Search again, ensuring it's line start
+             conclusion_start_pos = content_after_summary.find(f"\n{conclusion_keyword}")
+             if conclusion_start_pos != -1:
+                 conclusion_start_pos += 1 # Adjust index past the newline
+             else:
+                 return None # Conclusion not found at line start
+
+        overall_conclusion_paragraph = content_after_summary[conclusion_start_pos:].strip()
+        # The regulation check details are between summary and conclusion
+        regulation_check_details = content_after_summary[:conclusion_start_pos].strip()
+
+        # 5. Sanity check extracted parts
+        if not original_summary_sentence or not regulation_check_details or not overall_conclusion_paragraph:
+             print("Warning: Parsing failed to isolate all three analysis parts.")
              return None
 
-        content_after_marker = analysis_section[len(verify_marker):]
-        first_newline_pos = content_after_marker.find('\n')
-
-        if first_newline_pos == -1:
-            print("Warning: No newline found after intro in original analysis section.")
-            analysis_details = content_after_marker.strip()
-        else:
-            analysis_details = content_after_marker[first_newline_pos:].strip()
-
-        # Call the MODIFIED formatter which omits the marker
-        adapted_string = format_scot_output_variable(analysis_details, final_response)
+        # 6. Reformat using the two-stage smooth formatter
+        adapted_string = format_scot_output_variable_two_stage(
+            original_summary_sentence,
+            regulation_check_details,
+            overall_conclusion_paragraph,
+            final_response
+        )
         return adapted_string
 
     except Exception as e:
         print(f"An error occurred during parsing or adaptation: {e}")
         return None
+
+def extract_yes_categories(scot_output_text: str) -> list[str]:
+    """
+    Extracts category names marked with "Yes" from the SCoT analysis section.
+
+    Args:
+        scot_output_text: The complete SCoT output string containing the
+                          #### Verify Request section with the bulleted list.
+
+    Returns:
+        A list of category names that were marked with "Yes".
+        Returns an empty list if no matches are found or parsing fails.
+    """
+    categories_found = []
+
+    # Regex pattern breakdown:
+    # ^                - Start of a line (due to re.MULTILINE)
+    # \s*              - Optional leading whitespace
+    # \*               - Literal asterisk
+    # \s*              - Optional whitespace after asterisk
+    # (.*?)            - Capture Group 1: The category name (non-greedy match)
+    # \s*              - Optional whitespace before colon
+    # :                - Literal colon
+    # \s*              - Optional whitespace after colon
+    # Yes              - Literal word "Yes" (case-insensitive due to re.IGNORECASE)
+    # (?:              - Start of optional non-capturing group for the rest of the line
+    #   \.             - Optional literal period right after "Yes"
+    #   \s*            - Optional whitespace
+    #   Reason:.*      - Optional "Reason:" followed by anything
+    # )?               - End of optional group
+    # $                - End of the line (due to re.MULTILINE)
+    pattern = r"^\s*\*\s*(.*?)\s*:\s*Yes(?:\.?\s*Reason:.*)?$"
+
+    try:
+        # Find all matches using the pattern with multiline and ignorecase flags
+        matches = re.findall(pattern, scot_output_text, re.MULTILINE | re.IGNORECASE)
+
+        # Clean up captured category names (remove leading/trailing whitespace)
+        categories_found = [category.strip() for category in matches]
+
+    except Exception as e:
+        print(f"An error occurred during regex matching: {e}")
+        # Return an empty list in case of error
+        return []
+
+    return categories_found
+
 
 # ----------Enrich Function----------
 def batch_get_summary(questions: list[str], model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
@@ -248,8 +330,16 @@ class AnswerEvol:
 				break
 		# refusal part
 		refusal = self.generate_response(response)
-		return cot + "\n" + refusal
-	
+		
+        # assemble cot and refusal
+		scot = cot + "\n" + refusal
+		adapted_output = adapt_scot_string_two_stage(scot)
+		# filter out full No answer
+		extracted_categories = extract_yes_categories(adapted_output)
+		if len(extracted_categories) == 0:
+			return None
+		return adapted_output
+
 	def normal_cot(self, question: str, response: str, model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
 		prompt = summary_prompt.format(question=question)
 		llm = OpenAILLM(model_name=model_name, 
@@ -261,7 +351,13 @@ class AnswerEvol:
 				break
 		summary = safe_cot_normal_format.format(summary=summary)
 		output = self.generate_response(response)
-		return summary + "\n" + output
+		scot = summary + "\n" + output
+		# filter out Yes answer
+		adapted_output = adapt_scot_string_two_stage(scot)
+		extracted_categories = extract_yes_categories(adapted_output)
+		if len(extracted_categories) > 0:
+			return None
+		return adapted_output
 	
 # test function
 if __name__ == "__main__":
