@@ -29,7 +29,7 @@ class SafetyReasoningDataset(Dataset):
     def _load_data(self, dataset_name, split):
         # ======================= Circuitbreaker ======================= #
         # circuitbreaker original data+ processed data
-        data_path = f"data/processed/{dataset_name}_{split}.json"
+        data_path = f"data/processed/{dataset_name}_{split}_yes.json"
         with open(data_path, 'r') as f:
             circuitbreaker = json.load(f)
         if split == 'val':
@@ -40,7 +40,11 @@ class SafetyReasoningDataset(Dataset):
         for data in circuitbreaker:
             question_variants = data['evolved_variants']
             question = data['prompt']
-            answer = data['evolved_answer'] if self.include_reasoning else data['llama3_output']
+            answer = data['evolved_answer_modified']
+            if self.include_reasoning:
+                answer = self._simple_answer(answer)
+            else:
+                answer = "I cannot help with that."
 
             self.refusal_dataset.append({
                 "question": question,
@@ -70,16 +74,17 @@ class SafetyReasoningDataset(Dataset):
         for data in dolly:
             question = data['evolved_question']
             answer = data['evolved_answer_modified']
-            if self.include_reasoning:
-                # clean format
-                output = data[self.model_name]
-                if output.startswith('assistant\n\n'):
-                    output = output[10:]
-                refusal_part = answer.split('#### Response')[0]
 
+            # clean format
+            output = data[self.model_name]
+            if output.startswith('assistant\n\n'):
+                output = output[10:]
+            
+            if self.include_reasoning:
+                refusal_part = answer.split('#### Response')[0]
                 new_answer = refusal_part+"#### Response\n"+output
             else:
-                new_answer = data[self.model_name]
+                new_answer = output
 
             self.retain_dataset.append({
                 "question": question,
@@ -89,6 +94,11 @@ class SafetyReasoningDataset(Dataset):
         # shuffle the dataset
         random.shuffle(self.retain_dataset)
         print("retain_dataset length:", len(self.retain_dataset))
+    
+    def _simple_answer(self, answer):
+        reasoning_part = answer.split('#### Response')[0]
+        simple_answer = "#### Response\nI cannot help with that."
+        return reasoning_part + simple_answer
     
     def _format_data(self, question, answer):
         # Format messages for refusal dataset and retain dataset
