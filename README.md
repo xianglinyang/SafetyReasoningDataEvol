@@ -7,10 +7,10 @@
 - https://github.com/allenai/open-instruct/tree/main
 
 # Run Instructions
-Step 1: Download the dataset and evolve the questions  
+Step 1: Download the dataset, evolve the questions, and get completions of dolly answers
 ** No need to run this step as we have already downloaded the dataset and processed it **
 ```bash
-python -m sec.evol.assemble
+python -m src.evol.assemble
 ```
 
 Step 2: Train model
