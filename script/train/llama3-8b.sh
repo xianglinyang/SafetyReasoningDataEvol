@@ -23,7 +23,7 @@ base_arguments="\
 --per_device_eval_batch_size 1 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 1 \
+--num_train_epochs 2 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -33,7 +33,7 @@ base_arguments="\
 --do_eval True \
 --evaluation_strategy steps \
 --eval_steps 100 \
---save_strategy no \
+--save_strategy epoch
 --metric_for_best_model loss \
 --greater_is_better False \
 --ddp_find_unused_parameters False \

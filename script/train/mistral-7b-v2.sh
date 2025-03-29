@@ -7,22 +7,23 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=1 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
 --ratio 0.5 \
---max_seq_length 2048 \
+--max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
---lora_alpha 256 \
+--lora_alpha 128 \
 --lora_dropout 0.1 \
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
---per_device_train_batch_size 2 \
+--per_device_train_batch_size 1 \
+--per_device_eval_batch_size 1 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 0.2 \
+--num_train_epochs 2 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -31,14 +32,18 @@ base_arguments="\
 --do_train True \
 --do_eval True \
 --evaluation_strategy steps \
---eval_steps 100 \
---save_strategy no \
+--eval_steps 500 \
+--save_strategy epoch \
+--save_steps 0.5 \
 --metric_for_best_model loss \
 --greater_is_better False \
 --ddp_find_unused_parameters False \
 --warmup_ratio 0.03 \
 --weight_decay 0.0 \
 --logging_steps 1 \
+--remove_unused_columns False
+--include_variants True
+--include_reasoning 1
 "
 
 # ---------dataset arguments---------
@@ -46,7 +51,7 @@ dataset_names=("circuitbreaker")
 model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2"
 model_name_abbr="mistral-7b"
 
-out_dir="outputs"
+out_dir="/data2/xianglin/SCoT/outputs"
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do

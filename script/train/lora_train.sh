@@ -32,7 +32,6 @@ base_arguments="\
 --evaluation_strategy steps \
 --eval_steps 500 \
 --save_strategy epoch \
---save_steps 1 \
 --metric_for_best_model loss \
 --greater_is_better False \
 --ddp_find_unused_parameters False \
@@ -41,15 +40,16 @@ base_arguments="\
 --logging_steps 1 \
 --remove_unused_columns False
 --include_variants True
+--include_reasoning 0
 "
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
 model_name_or_paths=("meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
 model_name_abbrs=("llama3-8b" "mistral-7b")
-per_device_train_batch_size=(1 2)
+per_device_train_batch_size=(1 1)
 
-out_dir="outputs"
+out_dir="/data2/xianglin/SCoT/outputs"
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do

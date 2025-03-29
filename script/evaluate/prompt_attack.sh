@@ -7,7 +7,7 @@ jobs_num=$((per_gpu_jobs_num*gpu_num))
 
 model_name_or_path_list=(
     # "outputs/circuitbreaker/llama3-8b_20250121-122232/checkpoint-625"
-    "outputs/circuitbreaker/llama3-8b_20250121-122232/checkpoint-1248"
+    # "outputs/circuitbreaker/llama3-8b_20250121-122232/checkpoint-1248"
     # "outputs/circuitbreaker/llama3-8b_20250121-122232/"
     # "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-313"
     # "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-624"
@@ -25,39 +25,54 @@ model_name_or_path_list=(
     # Ablation retain dataasets
     # "outputs/circuitbreaker/llama3-8b_ablate_retain/checkpoint-624"
     # "outputs/circuitbreaker/mistral-7b_ablation_retain/checkpoint-624"
-    
+    "/data2/xianglin/SCoT/outputs/circuitbreaker/llama3-8b_20250329-001230"
 )
 dataset_name_list=(
     # "sorrybench"
-    # "jailbreakbench"
+    "jailbreakbench"
     # "advbench"
-    "llama3-8b-AutoDAN"
+    # "llama3-8b-AutoDAN"
     # "mistral-7b-AutoDAN"
-    "llama3-8b-GCG"
+    # "llama3-8b-GCG"
     # "mistral-7b-GCG"
 )
 attack_name_list=(
-    "none"
-    # "refusal_suppression"
+    # "none"
+    "refusal_suppression"
     # "prefix_injection"
 )
 
 # splits=(
 #     "logical_appeal"
-#     "uncommon_dialects"
-#     "role_play"
+    # "uncommon_dialects"
+    # "role_play"
 #     "expert_endorsement"
 #     "slang"
-#     "evidence-based_persuasion")
+#     "evidence-based_persuasion"
+
+#     "ascii"
+#     "authority_endorsement"
+#     "misspellings"
+#     "translate-fr"
+#     "translate-mr"
+#     "translate-zh-cn"
+#     "atbash"
+#     "caesar"
+#     "misrepresentation"
+#     "morse"
+#     "technical_terms"
+#     "translate-ml"
+#     "translate-ta"
+# )
 
 splits=("train")
+prompt_cot=0
 
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --device cuda \
 --torch_type bf16 \
---eval_num 100"
-# --split train \
+--eval_num 50"
 
 # Counter to distribute commands across GPUs
 counter=0
@@ -79,6 +94,7 @@ for split in ${splits[@]}; do
                     --model_name_or_path ${model_name_or_path} \
                     --dataset_name ${dataset_name} \
                     --attack_name ${attack_name} \
+                    --prompt_cot ${prompt_cot} \
                     --run_id "$run_id" &
                 
                 # Increment counter
