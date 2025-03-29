@@ -71,7 +71,7 @@ remove_categories = [
     "1", "4", "5", "10", "11", "15", "16", "17", "22", "23", "28", "31", "32", "33", "34", "35", "41", "42", "43", "44", "45"
 ]
 
-def data_reader(dataset_name, split):
+def data_reader(dataset_name, split, save_dir=None):
     # assert dataset_name in __datasets__, f"{dataset_name} is not supported yet"
 
     questions = list()
@@ -152,31 +152,15 @@ def data_reader(dataset_name, split):
         for item in data:
             prompt = item['nested_prompt']
             questions.append(prompt)
-            
-    elif dataset_name == "llama3-8b-GCG":
-        path = "/home/xianglin/git_space/HarmBench/test_cases/GCG/llama3-8b/test_cases.json"
-        with open(path, 'r') as f:
+    elif dataset_name == "harmbench":
+        assert save_dir is not None, "save_dir is required for harmfulbench"
+    
+        with open(save_dir, 'r') as f:
             data = json.load(f)
         for key, value in data.items():
             questions.append(value[0])
-    elif dataset_name == "llama3-8b-AutoDAN":
-        path = "/home/xianglin/git_space/HarmBench/test_cases/AutoDAN/llama3-8b/test_cases.json"
-        with open(path, 'r') as f:
-            data = json.load(f)
-        for key, value in data.items():
-            questions.append(value[0])
-    elif dataset_name == "mistral-7b-AutoDAN":
-        path = "/home/xianglin/git_space/HarmBench/test_cases/AutoDAN/mistral-7b/test_cases.json"
-        with open(path, 'r') as f:
-            data = json.load(f)
-        for key, value in data.items():
-            questions.append(value[0])
-    elif dataset_name == "mistral-7b-GCG":
-        path = "/home/xianglin/git_space/HarmBench/test_cases/GCG/mistral-7b/test_cases.json"
-        with open(path, 'r') as f:
-            data = json.load(f)
-        for key, value in data.items():
-            questions.append(value[0])
+    else:
+        raise ValueError(f"{dataset_name} is not supported yet")
 
     return questions, categories
 
