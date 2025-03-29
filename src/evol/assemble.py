@@ -187,14 +187,17 @@ def process_dolly():
     count = 0
     
     for data in tqdm(dataset, desc="Evolving Dolly dataset"):
+        count += 1
         question = data['evolved_question']
         output = data['answer']
         evolved_answer = data_evolver.answer_evol.normal_cot(question=question, response=output, refusal=False)
         if evolved_answer is None:
+            logger.info(f"Evolved {count} Answer is None")
+            logger.info("Skipping this question")
             continue
         data['evolved_answer'] = evolved_answer
         new_dataset.append(data)
-        count += 1
+        
         logger.info(f"{count} Question: {question}")
         logger.info(f"Evolved {count} Answer: {evolved_answer}")
     
@@ -265,10 +268,17 @@ def main():
     # process_dolly()
 
     # logger.info("Processing instruction following dataset...")
-    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-7b-chat-hf", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly.json", device_map="cuda:1", batch_size=4, max_new_tokens=2048)
+    # logger.info("Processing Llama-3.1-8B-Instruct dataset...")
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-3.1-8B-Instruct", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    
+    # logger.info("Processing mistral dataset...")
+    # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+
+    logger.info("Processing Qwen dataset...")
+    process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
 
 
 if __name__ == "__main__":    
