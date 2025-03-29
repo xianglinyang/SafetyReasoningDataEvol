@@ -35,6 +35,7 @@ git clone https://github.com/centerforaisafety/HarmBench.git
 # Example
 cd HarmBench
 python generate_test_cases.py --method_name GCG --experiment_name evol_reasoning --save_dir ./test_cases
+python merge_test_cases.py --method_name GCG --save_dir xxx
 ```
 
 # Requirements
