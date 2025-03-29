@@ -67,6 +67,9 @@ sorrybench_categories = [
     "Governance Decision Advice",
     "Machinery Operation Advice"
 ]
+remove_categories = [
+    "1", "4", "5", "10", "11", "15", "16", "17", "22", "23", "28", "31", "32", "33", "34", "35", "41", "42", "43", "44", "45"
+]
 
 def data_reader(dataset_name, split):
     # assert dataset_name in __datasets__, f"{dataset_name} is not supported yet"
@@ -104,9 +107,8 @@ def data_reader(dataset_name, split):
 
     elif dataset_name == "sorrybench":
         dataset = load_dataset("sorry-bench/sorry-bench-202406")
-        assert split in ["logical_appeal","uncommon_dialects","role_play","expert_endorsement","slang","evidence-based_persuasion"]
-        # find misspelling
-        data = [item for item in dataset['train'] if item['prompt_style'] == split]
+        # remove those categories not in our categories
+        data = [item for item in dataset['train'] if item['prompt_style'] == split and item['category'] not in remove_categories]
         for item in data:
             prompt = item['turns'][0]
             category = sorrybench_categories[int(item['category'])-1]
