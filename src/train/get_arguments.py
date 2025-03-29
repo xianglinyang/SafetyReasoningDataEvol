@@ -32,6 +32,12 @@ class DataArguments:
             "help": "Whether to include variants in the dataset"
         }
     )
+    include_reasoning: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help": "Whether to include reasoning in the dataset"
+        }
+    )
 
 @dataclass
 class ModelArguments:

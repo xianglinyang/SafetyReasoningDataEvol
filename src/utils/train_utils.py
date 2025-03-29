@@ -1,6 +1,8 @@
 import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
+import torch
+import os
 
 from src.utils.dtype_utils import str2dtype
 
@@ -60,6 +62,94 @@ def load_tokenizer_and_model(model_args):
 
     return tokenizer, model
 
+
+def merge_lora_checkpoint(base_model_path: str, output_path: str, device: str = "cpu"):
+    """
+    Loads the base model, applies the LoRA adapter, merges them,
+    and saves the standalone merged model.
+
+    Args:
+        base_model_path: Path to the original base model.
+        lora_adapter_path: Path to the saved LoRA adapter directory
+                           (e.g., "./training_output/checkpoint-1000/adapter_model").
+        merged_output_path: Path where the final merged model will be saved.
+    """
+    checkpoint_dirs = os.listdir(output_path)
+    # find those dirs with format "checkpoint-*"
+    checkpoint_dirs = [d for d in checkpoint_dirs if d.startswith("checkpoint-")]
+
+    for checkpoint_dir in checkpoint_dirs:
+        merged_output_path = os.path.join(output_path, checkpoint_dir)
+        lora_adapter_path = os.path.join(output_path, checkpoint_dir, "adapter_model")
+        logger.info(f"Loading PEFT adapter from: {lora_adapter_path}")
+
+        # --- Save Tokenizer ---
+        # Usually the tokenizer is saved alongside the adapter, find its path
+        # Assuming tokenizer was saved one level up from adapter_model dir
+        tokenizer_path = os.path.join(output_path, checkpoint_dir, "tokenizer")
+
+        if os.path.exists(tokenizer_path):
+            logger.info(f"Loading tokenizer from: {tokenizer_path}")
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+            logger.info(f"Saving tokenizer to: {merged_output_path}")
+            tokenizer.save_pretrained(merged_output_path, safe_serialization=True)
+            logger.info("Tokenizer saved.")
+        else:
+            logger.warning(f"Warning: Tokenizer not found at expected path: {tokenizer_path}. You may need to save it manually.")
+        
+        if tokenizer.pad_token is None:
+            logger.info("Adding special pad token to tokenizer.")
+            tokenizer.add_special_tokens({"pad_token": "<pad>"})
+
+        logger.info(f"Loading base model from: {base_model_path}")
+        # --- Load FRESH Base Model for THIS Checkpoint ---
+        base_model = AutoModelForCausalLM.from_pretrained(
+            base_model_path,
+            torch_dtype=torch.bfloat16, # Adjust dtype as needed
+            device_map=device # Load onto CPU initially
+        )
+        logger.info("Base model loaded.")
+
+        # --- Resize Embeddings for this specific loaded base model ---
+        embedding_size = base_model.get_input_embeddings().weight.shape[0]
+        if len(tokenizer) > embedding_size:
+            logger.info(f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
+            base_model.resize_token_embeddings(len(tokenizer))
+            logger.info("Token embeddings resized for this base model instance.")
+        else:
+            logger.info("Token embeddings size matches. No resize needed.")
+
+        # Load the PEFT model - this combines base + adapter
+        # is_trainable=False is important if you only want to merge, not continue training
+        peft_model = PeftModel.from_pretrained(
+            base_model,
+            lora_adapter_path,
+            is_trainable=False,
+            device_map=device # Keep on CPU
+        )
+        logger.info("PEFT adapter loaded onto base model.")
+
+        logger.info("Merging adapter weights...")
+        # Merge the adapter layers into the base model
+        # This returns the base model with updated weights
+        merged_model = peft_model.merge_and_unload()
+        logger.info("Merging complete.")
+
+        logger.info(f"Saving merged model to: {merged_output_path}")
+        # Save the merged model using standard transformers save_pretrained
+        merged_model.save_pretrained(merged_output_path, safe_serialization=True)
+        logger.info("Merged model saved.")
+
+        # release memory
+        del peft_model
+        del merged_model
+        del base_model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    logger.info("Process finished.")
+
+
 def save_tokenizer_and_model(model, tokenizer, training_args):
     # Save final model
     logger.info("*** Saving final model ***")
@@ -67,8 +157,8 @@ def save_tokenizer_and_model(model, tokenizer, training_args):
     # LoRA model, need to merge before saving
     merge_model = model.merge_and_unload()
     assert merge_model.get_input_embeddings().weight.shape[0] == len(tokenizer)
-    merge_model.save_pretrained(training_args.output_dir)
+    merge_model.save_pretrained(training_args.output_dir, safe_serialization=True)
 
-    tokenizer.save_pretrained(training_args.output_dir)
+    tokenizer.save_pretrained(training_args.output_dir, safe_serialization=True)
 
     logger.info(f"Model saved to {training_args.output_dir}")

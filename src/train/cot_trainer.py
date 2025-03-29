@@ -1,7 +1,11 @@
+import os
+import shutil
 import torch
 from transformers import Trainer
 from tqdm import tqdm
 import logging
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import PeftModel
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +66,7 @@ class SafetyCoTTrainer(Trainer):
         retain_outputs = model(**retain_inputs)
         retain_loss = retain_outputs.loss
 
-        retain_coeff, refusal_coeff = 0.5, 0.5
+        retain_coeff, refusal_coeff = 1, 1
 
         total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
         logger.info(f"total_loss: {total_loss:.4f} || retain_loss/weighted: {retain_loss:.4f} {retain_coeff*retain_loss:.4f} || refusal_loss/weighted: {refusal_loss:.4f} {refusal_coeff*refusal_loss:.4f}")
@@ -131,8 +135,36 @@ class SafetyCoTTrainer(Trainer):
         
         return metrics
     
-    def save_model(self, output_dir: str, _internal_call: bool = False):
-        merged_model = self.model.merge_and_unload()
+    # def save_model(self, output_dir: str, _internal_call: bool = False):
+    # bug: merge_and_unload modifies loaded_peft_model in-place and returns the base model
+    #     merged_model = self.model.merge_and_unload()
 
-        merged_model.save_pretrained(output_dir)
-        self.tokenizer.save_pretrained(output_dir)
+    #     merged_model.save_pretrained(output_dir)
+    #     self.tokenizer.save_pretrained(output_dir)
+
+    def save_model(self, output_dir: str, _internal_call: bool = False):
+        """
+        Event called after a checkpoint save. Saves PEFT adapter weights.
+        """
+        # The Trainer automatically saves the full state (optimizer, scheduler etc)
+        # in the checkpoint_dir. We only need to save the PEFT adapter weights
+        # using save_pretrained within that directory.
+
+        # Save PEFT adapter model
+        peft_save_path = os.path.join(output_dir, "adapter_model")
+        try:
+            logging.info(f"Saving PEFT adapter weights to {peft_save_path}...")
+            self.model.save_pretrained(peft_save_path)
+            logging.info("PEFT adapter weights saved successfully.")
+        except Exception as e:
+            logging.error(f"Error saving PEFT adapter model: {e}")
+
+        # Save Tokenizer (often needed with the model)
+        if self.tokenizer is not None:
+            tokenizer_save_path = os.path.join(output_dir, "tokenizer")
+            try:
+                logging.info(f"Saving tokenizer to {tokenizer_save_path}...")
+                self.tokenizer.save_pretrained(tokenizer_save_path)
+                logging.info("Tokenizer saved successfully.")
+            except Exception as e:
+                logging.error(f"Error saving tokenizer: {e}")
