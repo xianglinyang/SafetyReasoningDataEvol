@@ -320,7 +320,7 @@ def main():
     del llm
     torch.cuda.empty_cache()
 
-    evaluation = evaluate_jailbreak(attack_questions, responses, categories, methodologies=["substring_matching", "llamaguard3"])
+    evaluation = evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching", "llamaguard3"])
 
     results = {
         "model_name_or_path": model_name_or_path,
