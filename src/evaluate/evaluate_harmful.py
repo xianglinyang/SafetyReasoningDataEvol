@@ -135,7 +135,7 @@ def llamaguard3_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
 
     chats = [
         [
-            {"role": "user", "content": ""},
+            {"role": "user", "content": prompt},
             {"role": "assistant", "content": response},
         ]
         for prompt, response in zip(prompts, responses)
