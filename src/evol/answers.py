@@ -204,7 +204,7 @@ def format_scot_output_variable_two_stage(
 
 # --- Updated Parsing Logic (Two-Stage) ---
 
-def adapt_scot_string_two_stage(input_scot_string: str) -> str | None:
+def adapt_scot_string_two_stage(input_scot_string: str, intention: str = None) -> str | None:
     """
     Parses original SCoT into summary, regulation details, and conclusion,
     then applies two-stage smooth variability formatting.
@@ -226,6 +226,8 @@ def adapt_scot_string_two_stage(input_scot_string: str) -> str | None:
         if first_period_pos == -1: return None # Need summary
         original_summary_sentence = content_after_marker[:first_period_pos + 1].strip()
         content_after_summary = content_after_marker[first_period_pos + 1:].strip()
+        if intention is not None:
+            original_summary_sentence = intention
 
         # 4. Isolate Conclusion Paragraph (heuristic: starts with "Therefore")
         conclusion_keyword = "Therefore,"
