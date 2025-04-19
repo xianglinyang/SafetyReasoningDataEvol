@@ -64,7 +64,7 @@ class SafetyReasoningDataset(Dataset):
             
         # ==========================  Retain ========================== #
         # dolly dataset
-        data_path = f"data/processed/dolly_{split}.json"
+        data_path = f"data/processed/dolly_{split}_intention.json"
         with open(data_path, 'r') as f:
             dolly = json.load(f)
         if split == 'val':
