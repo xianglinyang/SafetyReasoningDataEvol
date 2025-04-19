@@ -135,7 +135,7 @@ def llamaguard3_judge_fn(prompts: List[str], responses: List[str]) -> List[int]:
 
     chats = [
         [
-            {"role": "user", "content": prompt},
+            {"role": "user", "content": ""},
             {"role": "assistant", "content": response},
         ]
         for prompt, response in zip(prompts, responses)
@@ -289,6 +289,7 @@ def main():
     parser.add_argument("--attack_name", type=str)
     parser.add_argument("--prompt_cot", type=int, default=0)    # baseline: direct prompting with safe CoT
     parser.add_argument("--run_id", type=str, help="Unique identifier for this run for logging")
+    parser.add_argument("--save_dir", type=str, default=None, help="Path to save the attack questions")
     args = parser.parse_args()
 
     setup_logging(task_name="evaluate_harmful", run_id=args.run_id)
@@ -302,6 +303,7 @@ def main():
     device = args.device
     attack_name = args.attack_name
     direct_prompting = args.prompt_cot
+    save_dir = args.save_dir
 
     torch_type = args.torch_type
     if torch_type == "bf16":
@@ -314,8 +316,9 @@ def main():
         raise ValueError(f"Invalid torch_type: {torch_type}")
 
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
-    dataset = HarmfulDataset(dataset_name=dataset_name, split=split)
+    dataset = HarmfulDataset(dataset_name=dataset_name, split=split, save_dir=save_dir)
     attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num, direct_prompting)
+    eval_num = len(attack_questions)
     # release gpu memory
     del llm
     torch.cuda.empty_cache()
@@ -330,6 +333,7 @@ def main():
         "direct_prompting": direct_prompting,
         "split": split,
         "attack_type": "prompt" if attack_name in __prompt_attacks_methods__ else "adv",
+        "attack_dir": save_dir,
         "evaluation": evaluation,
         "evaluation_date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
