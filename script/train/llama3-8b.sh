@@ -7,7 +7,7 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="torchrun --nproc_per_node=8 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
 --ratio 0.5 \
@@ -20,10 +20,10 @@ base_arguments="\
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
 --per_device_train_batch_size 1 \
---per_device_eval_batch_size 1 \
+--per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 2 \
+--num_train_epochs 3 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -31,8 +31,7 @@ base_arguments="\
 --overwrite_output_dir True \
 --do_train True \
 --do_eval True \
---evaluation_strategy steps \
---eval_steps 100 \
+--eval_steps 300 \
 --save_strategy epoch
 --metric_for_best_model loss \
 --greater_is_better False \
@@ -48,7 +47,7 @@ dataset_names=("circuitbreaker")
 model_name_or_path="meta-llama/Llama-3.1-8B-Instruct"
 model_name_abbr="llama3-8b"
 
-out_dir="/data2/xianglin/SCoT/outputs"
+out_dir="/mnt/hdd1/ljiahao/xianglin/SCoT"
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do
