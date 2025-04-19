@@ -19,6 +19,7 @@ __datasets__ = [
     "Malicious Instruct",
     "circuitbreaker"
     "renellm"
+    "xstest"
 ]
 
 sorrybench_categories = [
@@ -160,6 +161,18 @@ def data_reader(dataset_name, split, save_dir=None):
             data = json.load(f)
         for key, value in data.items():
             questions.append(value[0])
+    elif dataset_name == "xstest":
+        assert split in ["safe", "unsafe"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("walledai/XSTest")
+        data = ds['test']
+        
+        for item in data:
+            label = item['label']
+            if label == split:
+                prompt = item['prompt']
+                category = item['focus']
+                questions.append(prompt)
+                categories.append(category)
     else:
         raise ValueError(f"{dataset_name} is not supported yet")
 
