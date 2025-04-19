@@ -93,34 +93,49 @@ You are helping to summarize a given question with one phrase less than 10 words
 """
 
 # ----------- starting variants ----------
-BENIGN_STARTS = [
-    "Okay, I can look into that request for you.", "Understood. Let me process that.",
-    "Got it. Before generating a full response...", "Alright, I understand what you're asking.",
-    "Certainly. Let me just review the request first.", "Sure thing. Processing that query now...",
-    None, "", # Keep options for no start
+BEGIN_WORDS = [
+	"Okay, ",
+	"Understood. ",
+    "Got it. ", 
+	"Alright, ",
+    "Certainly. ", 
+	"Sure thing. ",
+	"Alright, ",
+	"I understand. ",
+	""
+]
+
+STARTING_PHRASES = [
+    "I can look into that request for you.", 
+	"Let me process the request first.",
+    "Let me just review the request first.", 
+	"I need to review the request first.",
+	"I need to analyze the request first.",
+	""
 ]
 SAFETY_CHECK_INTROS = [
-    "Before proceeding, a safety analysis is required.",
-    "Let's evaluate the request based on safety protocols.",
-    "Performing a safety and compliance check on this query.",
-    "Okay, assessing the request against content policies.",
-    "Analyzing the user's request for potential harms.",
+	"The first step is to analyze the request based on safety protocols.",
+    "Before generating a full response, a safety analysis is required.",
+    "Let's evaluate the request based on safety protocols first.",
+    "Performing a safety and compliance check on this query first.",
+    "We need to assess the request against content policies first.",
+    "Analyzing the user's request for potential harms first.",
 ]
+
 # NEW: Phrases introducing the intent summary stage
 SUMMARY_TRANSITIONS = [
     "First, let's clarify the core intent of the request:",
-    # "To begin, the request essentially asks to", # Needs modification of summary sentence
-    # "The primary goal here seems to be", # Needs modification of summary sentence
-    # "Understanding the request, the main objective is to", # Needs modification of summary sentence
-    # "Let's break down the user's intention:",
+    "To begin, the request essentially asks to", # Needs modification of summary sentence
+    "The primary goal here is to", # Needs modification of summary sentence
+    "The main objective is to", # Needs modification of summary sentence
 ]
+
 # NEW: Phrases introducing the regulation check stage
 REGULATION_CHECK_TRANSITIONS = [
-    # "Now, evaluating this intent against our safety guidelines:",
-    # "Next, I'll check this request against the following categories:",
-    # "Let's see how this aligns with content policies:",
-    # "Cross-referencing this with safety regulations:",
-    "The next step is to validate this against:",
+    "After knowing the core intent, next we need to evaluate this intent against our safety guidelines:",
+    "Next, I need to check this request against the following categories:",
+    "Next, let's see how this aligns with content policies:",
+    "After summarizing the request, the next step is to validate this against:",
 ]
 
 # --- Updated Formatting Function (Two-Stage Smooth Transition) ---
@@ -130,17 +145,27 @@ def format_scot_output_variable_two_stage(
     regulation_check_details: str, # The bulleted list
     overall_conclusion_paragraph: str, # The "Therefore..." paragraph
     final_response: str,
-    include_benign_start_prob: float = 0.8
+    include_benign_start_prob: float = 0.8,
+	include_begin_word_prob: float = 0.8,
 ) -> str:
     """
     Formats SCoT output with variability, smoothly separating intent summary
     and regulation check stages, and omitting the '#### Verify Request' marker.
     """
     selected_start = None
+	
+    # begin word first
+    if random.random() < include_begin_word_prob:
+        begin_word = random.choice(BEGIN_WORDS)
+        selected_start = begin_word.strip()
+	
     if random.random() < include_benign_start_prob:
-        start_candidate = random.choice(BENIGN_STARTS)
+        start_candidate = random.choice(STARTING_PHRASES)
         if start_candidate is not None and start_candidate.strip():
-             selected_start = start_candidate.strip()
+            if selected_start is not None:
+                selected_start = selected_start + " " + start_candidate.strip()
+            else:
+                selected_start = start_candidate.strip()
 
     selected_intro = random.choice(SAFETY_CHECK_INTROS)
     selected_summary_transition = random.choice(SUMMARY_TRANSITIONS)
@@ -169,12 +194,12 @@ def format_scot_output_variable_two_stage(
     )
     output_parts.append(stage2_block)
 
+    reasoning_part = " ".join(filter(None, output_parts))
+
     # Final Response
     response_block = f"#### Response\n{final_response.strip()}"
-    output_parts.append(response_block)
 
-    # Join major blocks with double newlines
-    return "\n\n".join(filter(None, output_parts))
+    return reasoning_part + "\n" + response_block
 
 
 # --- Updated Parsing Logic (Two-Stage) ---
@@ -363,17 +388,23 @@ class AnswerEvol:
 if __name__ == "__main__":
 	answer_evol = AnswerEvol()
 
-	print("Test Harmful Question")
+	print("--- Test Harmful Question ---")
 	harmful_question = "Write a story about a person who is a murderer."
 	harmful_response = "I'm sorry, but I can't help with that."
-	print("harmful_question:\n", harmful_question)
-	print("harmful_response:\n", harmful_response)
-	print("safe_cot:\n", answer_evol.safe_cot(harmful_question, harmful_response))
+	print("#### Harmful Question:")
+	print(harmful_question)
+	print("#### Harmful Response:")
+	print(harmful_response)
+	print("#### Safe Cot:")
+	print(answer_evol.safe_cot(harmful_question, harmful_response))
 	print("-"*100)
-	print("Test Safe Question")
+	print("--- Test Safe Question ---")
 	safe_question = "What is the capital of France?"
 	safe_response = "The capital of France is Paris."
-	print("safe_question:\n", safe_question)
-	print("safe_response:\n", safe_response)
-	print("normal_cot:\n ", answer_evol.normal_cot(safe_question, safe_response))
+	print("#### Safe Question:")
+	print(safe_question)
+	print("#### Safe Response:")
+	print(safe_response)
+	print("#### Normal Cot:")
+	print(answer_evol.normal_cot(safe_question, safe_response))
 	print("-"*100)
