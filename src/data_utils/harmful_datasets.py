@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 __datasets__ = [
     "jailbreakbench",
     "harmbench",
+    "harmbench_attack",
     "sorrybench",
     "advbench",
     "Malicious Instruct",
@@ -152,7 +153,7 @@ def data_reader(dataset_name, split, save_dir=None):
         for item in data:
             prompt = item['nested_prompt']
             questions.append(prompt)
-    elif dataset_name == "harmbench":
+    elif dataset_name == "harmbench_attack":
         assert save_dir is not None, "save_dir is required for harmfulbench"
     
         with open(save_dir, 'r') as f:
@@ -166,10 +167,10 @@ def data_reader(dataset_name, split, save_dir=None):
 
 
 class HarmfulDataset(Dataset):
-    def __init__(self, dataset_name, split):
+    def __init__(self, dataset_name, split, save_dir=None):
         super().__init__()
         self.dataset_name = dataset_name
-        self.questions, self.categories = data_reader(self.dataset_name, split)
+        self.questions, self.categories = data_reader(self.dataset_name, split, save_dir)
         self.len = len(self.questions)
 
     def __len__(self):
