@@ -7,7 +7,7 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="torchrun --nproc_per_node=8 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
 --ratio 0.5 \
@@ -19,11 +19,11 @@ base_arguments="\
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
---per_device_train_batch_size 1 \
---per_device_eval_batch_size 1 \
+--per_device_train_batch_size 2 \
+--per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 2 \
+--num_train_epochs 3 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -31,10 +31,8 @@ base_arguments="\
 --overwrite_output_dir True \
 --do_train True \
 --do_eval True \
---evaluation_strategy steps \
 --eval_steps 500 \
 --save_strategy epoch \
---save_steps 0.5 \
 --metric_for_best_model loss \
 --greater_is_better False \
 --ddp_find_unused_parameters False \
@@ -51,7 +49,7 @@ dataset_names=("circuitbreaker")
 model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2"
 model_name_abbr="mistral-7b"
 
-out_dir="/data2/xianglin/SCoT/outputs"
+out_dir="/mnt/hdd1/ljiahao/xianglin/SCoT"
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do
