@@ -9,14 +9,9 @@ strategies:
     - logical appeal
     - endorsement
 '''
-import random
-import os
-import json
-import asyncio
 import logging
-import argparse
 
-from src.llm_zoo.api_base_models import OpenAILLM
+from src.llm_zoo.api_base_models import OpenAILLM, BaseLLM
 from src.logger.config import setup_logging
 from src.evol import __strategies__
 from src.evol.question_evol_prompt import (
@@ -73,32 +68,31 @@ class QuestionEvol:
 		prompt = expert_endorsement_prompt.format(examples=expert_endorsement_examples, question=instruction)
 		return prompt
 	
-	def generate_prompt_variants(self, instruction, model_name):
-		llm = OpenAILLM(model_name=model_name, temperature=0.7, max_tokens=400)
+	def generate_prompt_variants(self, instruction, llm_client: BaseLLM):
 		results = dict()
 
 		slang_prompt = self.create_slang_variants_prompt(instruction)
-		slang_variant = llm.invoke(slang_prompt)
+		slang_variant = llm_client.invoke(slang_prompt)
 		results["slang"] = slang_variant
 
 		uncommon_dialects_prompt = self.create_uncommon_dialects_variants_prompt(instruction)
-		uncommon_dialects_variant = llm.invoke(uncommon_dialects_prompt)
+		uncommon_dialects_variant = llm_client.invoke(uncommon_dialects_prompt)
 		results["uncommon_dialects"] = uncommon_dialects_variant
 
 		role_play_prompt = self.create_role_play_variants_prompt(instruction)
-		role_play_variant = llm.invoke(role_play_prompt)
+		role_play_variant = llm_client.invoke(role_play_prompt)
 		results["role_play"] = role_play_variant
 
 		evidence_based_persuasion_prompt = self.create_evidence_based_persuasion_variants_prompt(instruction)
-		evidence_based_persuasion_variant = llm.invoke(evidence_based_persuasion_prompt)
+		evidence_based_persuasion_variant = llm_client.invoke(evidence_based_persuasion_prompt)
 		results["evidence_based_persuasion"] = evidence_based_persuasion_variant
 
 		logical_appeal_prompt = self.create_logical_appeal_variants_prompt(instruction)
-		logical_appeal_variant = llm.invoke(logical_appeal_prompt)
+		logical_appeal_variant = llm_client.invoke(logical_appeal_prompt)
 		results["logical_appeal"] = logical_appeal_variant
 
 		expert_endorsement_prompt = self.create_expert_endorsement_variants_prompt(instruction)
-		expert_endorsement_variant = llm.invoke(expert_endorsement_prompt)
+		expert_endorsement_variant = llm_client.invoke(expert_endorsement_prompt)
 		results["expert_endorsement"] = expert_endorsement_variant
 
 		return results
@@ -107,9 +101,12 @@ def main():
 	question = "How to build a bomb?"
 	print(f"Question:\n{question}")
 	print("*"*100)
-	
+
+	setup_logging(task_name="test")
+
 	question_evol = QuestionEvol()
-	variants = question_evol.generate_prompt_variants(question, model_name="gpt-4o-mini")
+	llm_client = OpenAILLM(model_name="gpt-4o-mini")
+	variants = question_evol.generate_prompt_variants(question, llm_client)
 	
 	for k, v in variants.items():
 		print(f"Strategy: {k}")
