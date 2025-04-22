@@ -24,6 +24,9 @@ class OpenAILLM(BaseLLM):
     """OpenAI LLM wrapper that supports both chat and instruct models"""
     MODEL_CATEGORIES = {
         "chat": [
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "gpt-4.1-nano"
             "chatgpt-4o-latest",
             "gpt-4-turbo",
             "gpt-4-turbo-2024-04-09",
