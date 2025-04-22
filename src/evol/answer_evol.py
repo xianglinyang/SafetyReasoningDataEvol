@@ -155,10 +155,13 @@ class AnswerEvol:
         else:
             raise ValueError(f"Invalid question type: {question_type}")
     
-    def generate_evol_answer(self,llm_client: BaseLLM, question: str, question_type: str, answer=None):
+    def generate_evol_answer(self,llm_client: BaseLLM, question: str, question_type: str, answer=None, return_metadata=True):
         metadata = self._get_metadata(llm_client, question, question_type)
         answer_block = metadata_to_answer(metadata, answer)
-        return answer_block
+        if return_metadata:
+            return answer_block, metadata
+        else:
+            return answer_block
 
 
 if __name__ == "__main__":
@@ -167,7 +170,7 @@ if __name__ == "__main__":
     answer = "Paris"
     question_type = "benign"
     llm_client = OpenAILLM(model_name="gpt-4o-mini")
-    print(answer_evol.generate_evol_answer(llm_client, question, question_type, answer))
+    print(answer_evol.generate_evol_answer(llm_client, question, question_type, answer, return_metadata=False))
 
     print("--------------------------------")
 
@@ -175,4 +178,4 @@ if __name__ == "__main__":
     answer = "I am sorry, I cannot help with that."
     question_type = "harmful"
     llm_client = OpenAILLM(model_name="gpt-4o-mini")
-    print(answer_evol.generate_evol_answer(llm_client, question, question_type, answer))
+    print(answer_evol.generate_evol_answer(llm_client, question, question_type, answer, return_metadata=False))
