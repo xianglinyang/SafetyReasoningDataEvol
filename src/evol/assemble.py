@@ -23,6 +23,8 @@ from datasets import load_dataset
 from src.evol.question_evol import QuestionEvol
 from src.evol.answers import AnswerEvol
 from src.llm_zoo.utils import batch_invoke, load_model, load_tokenizer
+from src.llm_zoo.api_base_models import BaseLLM
+from src.llm_zoo.api_base_models import OpenAILLM
 from src.logger.config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -40,13 +42,18 @@ class DataEvolver:
         self.question_evol = QuestionEvol()
         self.answer_evol = AnswerEvol()
     
-    def evol_data(self, question, answer_output, refusal=True):
-        question_variants = self.question_evol.generate_prompt_variants(question, model_name="gpt-4o-mini")
-        if refusal:
-            answer_instance = self.answer_evol.safe_cot(question, answer_output)
-        else:
-            answer_instance = self.answer_evol.normal_cot(question, answer_output)
-        return question_variants, answer_instance
+    def evol_question(self, question_llm: BaseLLM, question):
+        question_variants = self.question_evol.generate_prompt_variants(question, question_llm)
+        return question_variants
+    
+    def evol_answer(self, answer_llm: BaseLLM, question, question_type, answer_output):
+        answer_block, metadata = self.answer_evol.generate_evol_answer(answer_llm, question, question_type, answer_output, return_metadata=True)
+        return answer_block, metadata
+    
+    def evol_data(self, question_llm: BaseLLM, answer_llm: BaseLLM, question, answer_output, question_type):
+        question_variants = self.question_evol.generate_prompt_variants(question, question_llm)
+        answer_block, metadata = self.answer_evol.generate_evol_answer(answer_llm, question, question_type, answer_output, return_metadata=True)
+        return question_variants, answer_block, metadata
 
 #-------------------------Data Loading and Saving-------------------------
 # Adapt from https://raw.githubusercontent.com/GraySwanAI/circuit-breakers/refs/heads/main/data/circuit_breakers_val.json
@@ -121,6 +128,9 @@ def process_circuitbreaker_train_dataset():
     raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_train.json')
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_train.json')
 
+    question_llm = OpenAILLM(model_name="gpt-4o-mini")
+    answer_llm = OpenAILLM(model_name="gpt-4.1-mini")
+
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
         dataset = json.load(f)
@@ -128,15 +138,14 @@ def process_circuitbreaker_train_dataset():
     data_evolver = DataEvolver()
     new_dataset = []
     count = 0
+
     for data in tqdm(dataset, desc="Evolving dataset"):
         question = data['prompt']
-        refusal_output = data['llama3_output']
-        question_variants, answer_instance = data_evolver.evol_data(question, refusal_output, refusal=True)
+        question_variants, answer_instance, metadata = data_evolver.evol_data(question_llm, answer_llm, question, answer=None, question_type="harmful")
 
-        if answer_instance is None:
-            continue
         data['evolved_variants'] = question_variants
         data['evolved_answer'] = answer_instance
+        data['metadata'] = metadata
         count += 1
         new_dataset.append(data)
         logger.info(f"Evolved {count} Question Variants: {question_variants}")
@@ -151,9 +160,12 @@ def process_circuitbreaker_val_dataset():
     raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_val.json')
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_val.json')
 
+    question_llm = OpenAILLM(model_name="gpt-4o-mini")
+    answer_llm = OpenAILLM(model_name="gpt-4.1-mini")
+
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
-        dataset = json.load(f)[:100]
+        dataset = json.load(f)
 
     data_evolver = DataEvolver()
     new_dataset = []
@@ -161,11 +173,11 @@ def process_circuitbreaker_val_dataset():
     for data in tqdm(dataset, desc="Evolving dataset"):
         question = data['prompt']
         output = data['llama3_output']
-        question_variants, answer_instance = data_evolver.evol_data(question, output, refusal=False)
-        if answer_instance is None:
-            continue
+        question_variants, answer_instance, metadata = data_evolver.evol_data(question_llm, answer_llm, question, answer=output, question_type="benign")
+
         data['evolved_variants'] = question_variants
         data['evolved_answer'] = answer_instance
+        data['metadata'] = metadata
         count += 1
         logger.info(f"Evolved {count} Question Variants: {question_variants}")
         logger.info(f"Evolved {count} Answer: {answer_instance}")
@@ -179,6 +191,8 @@ def process_dolly():
     logger.info(f"Processing dolly dataset...")
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
 
+    answer_llm = OpenAILLM(model_name="gpt-4.1-mini")
+
     with open(processed_file_path, 'r') as f:
         dataset = json.load(f)
     
@@ -190,16 +204,14 @@ def process_dolly():
         count += 1
         question = data['evolved_question']
         output = data['answer']
-        evolved_answer = data_evolver.answer_evol.normal_cot(question=question, response=output, refusal=False)
-        if evolved_answer is None:
-            logger.info(f"Evolved {count} Answer is None")
-            logger.info("Skipping this question")
-            continue
-        data['evolved_answer'] = evolved_answer
+
+        answer_instance, metadata = data_evolver.evol_answer(answer_llm, question, "benign", output, return_metadata=True)
+        data['evolved_answer'] = answer_instance
+        data['metadata'] = metadata
         new_dataset.append(data)
         
         logger.info(f"{count} Question: {question}")
-        logger.info(f"Evolved {count} Answer: {evolved_answer}")
+        logger.info(f"Evolved {count} Answer: {answer_instance}")
     
     # randomly split it into train and val with ratio=8:2
     random.shuffle(new_dataset)
