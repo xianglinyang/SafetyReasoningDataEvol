@@ -32,6 +32,7 @@ class SafetyReasoningDataset(Dataset):
         data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
         with open(data_path, 'r') as f:
             circuitbreaker = json.load(f)
+        # for faster computation
         if split == 'val':
             circuitbreaker = circuitbreaker[:100]
     
@@ -41,12 +42,11 @@ class SafetyReasoningDataset(Dataset):
             question_variants = data['evolved_variants']
             question = data['prompt']
             answer = data['evolved_answer_modified']
-            refusal = data['llama3_output']
+
             if self.include_reasoning:
-                answer = self._simple_answer(answer, refusal)
+                answer = self._simple_answer(answer)
             else:
-                # answer = "I cannot help with that."
-                answer = refusal
+                answer = data['llama3_output']
 
             self.refusal_dataset.append({
                 "question": question,
@@ -97,12 +97,9 @@ class SafetyReasoningDataset(Dataset):
         random.shuffle(self.retain_dataset)
         print("retain_dataset length:", len(self.retain_dataset))
     
-    def _simple_answer(self, answer, refusal=None):
+    def _simple_answer(self, answer):
         reasoning_part = answer.split('#### Response')[0]
-        if refusal:
-            simple_answer = f"#### Response\n{refusal}"
-        else:
-            simple_answer = "#### Response\nI cannot help with that."
+        simple_answer = "#### Response\nI cannot help with that."
         return reasoning_part + simple_answer
     
     def _format_data(self, question, answer):
