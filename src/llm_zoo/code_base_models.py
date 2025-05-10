@@ -49,20 +49,20 @@ class HuggingFaceLLM(BaseLLM):
         self.tokenizer.padding_side = "left"
 
     def _load_model(self):
-        is_peft = os.path.exists(os.path.join(self.model_name_or_path, "adapter_config.json"))
-        if is_peft:
-            logger.info("Loading LoRA model from {}".format(self.model_name_or_path))
-            # load this way to make sure that optimizer states match the model structure
-            config = LoraConfig.from_pretrained(self.model_name_or_path)
-            base_model = AutoModelForCausalLM.from_pretrained(
-                config.base_model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
-            self.model = PeftModel.from_pretrained(
-                base_model, self.model_name_or_path, device_map=self.device)
-        else:
-            logger.info(f"Loading base model from {self.model_name_or_path}")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                self.model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
-            print("model loaded")
+        # is_peft = os.path.exists(os.path.join(self.model_name_or_path, "adapter_config.json"))
+        # if is_peft:
+        #     logger.info("Loading LoRA model from {}".format(self.model_name_or_path))
+        #     # load this way to make sure that optimizer states match the model structure
+        #     config = LoraConfig.from_pretrained(self.model_name_or_path)
+        #     base_model = AutoModelForCausalLM.from_pretrained(
+        #         config.base_model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
+        #     self.model = PeftModel.from_pretrained(
+        #         base_model, self.model_name_or_path, device_map=self.device)
+        # else:
+        logger.info(f"Loading base model from {self.model_name_or_path}")
+        self.model = AutoModelForCausalLM.from_pretrained(
+            pretrained_model_name_or_path=self.model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
+        print("model loaded")
 
     def prompt2messages(self, prompt):
         messages = list()
