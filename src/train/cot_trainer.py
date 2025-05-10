@@ -10,13 +10,15 @@ from peft import PeftModel
 logger = logging.getLogger(__name__)
 
 class SafetyCoTTrainer(Trainer):
-    def __init__(self, alpha, total_steps, *args, **kwargs):
+    def __init__(self, alpha, total_steps, benign_lambda, harmful_lambda, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # incase
         self.args.remove_unused_columns = False
         self.current_training_step = 0
         self.alpha = alpha
         self.total_steps = total_steps
+        self.benign_lambda = benign_lambda
+        self.harmful_lambda = harmful_lambda
     
     def get_training_progress(self):
         # return self.current_training_step / self.total_steps
@@ -66,7 +68,7 @@ class SafetyCoTTrainer(Trainer):
         retain_outputs = model(**retain_inputs)
         retain_loss = retain_outputs.loss
 
-        retain_coeff, refusal_coeff = 1, 1
+        retain_coeff, refusal_coeff = self.benign_lambda, self.harmful_lambda
 
         total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
         logger.info(f"total_loss: {total_loss:.4f} || retain_loss/weighted: {retain_loss:.4f} {retain_coeff*retain_loss:.4f} || refusal_loss/weighted: {refusal_loss:.4f} {refusal_coeff*refusal_loss:.4f}")

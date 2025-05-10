@@ -76,7 +76,9 @@ def main():
             tokenizer=tokenizer, model=model, padding="longest"),
         callbacks=[LoggingCallback()],
         alpha=0.5,
-        total_steps=max_steps
+        total_steps=max_steps,
+        benign_lambda=model_args.benign_lambda,
+        harmful_lambda=model_args.harmful_lambda
     )
     
     # Training

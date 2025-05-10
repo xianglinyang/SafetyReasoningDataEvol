@@ -20,12 +20,6 @@ class DataArguments:
             "help": "The maximum total input sequence length after tokenization."
         }
     )
-    ratio: Optional[float] = field(
-        default=0.5,
-        metadata={
-            "help": "The ratio of the dataset of harmful and helpful to use"
-        }
-    )
     include_variants: Optional[bool] = field(
         default=True,
         metadata={
@@ -52,6 +46,18 @@ class ModelArguments:
                 "The model checkpoint for weights initialization. Don't set if you want to train a model from scratch."
             )
         },
+    )
+    benign_lambda: Optional[float] = field(
+        default=1,
+        metadata={
+            "help": "The lambda for the benign examples"
+        }
+    )
+    harmful_lambda: Optional[float] = field(
+        default=1,
+        metadata={
+            "help": "The lambda for the harmful examples"
+        }
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
@@ -104,8 +110,8 @@ class ModelArguments:
     ### added ####
     lora: Optional[bool] = field(default=False, metadata={
                                  "help": "whether to use lora"})
-    lora_r: Optional[int] = field(default=8, metadata={"help": ("r for lora")})
-    lora_alpha: Optional[float]=field(default=32, metadata={"help": ("alpha for lora")})
+    lora_r: Optional[int] = field(default=64, metadata={"help": ("r for lora")})
+    lora_alpha: Optional[float]=field(default=256, metadata={"help": ("alpha for lora")})
     lora_dropout: Optional[float]=field(default=0.1, metadata={"help": ("dropout for lora")})
     lora_target_modules: List[str]=field(
         default_factory=list, metadata={"help": ("target modules for lora")})
