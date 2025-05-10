@@ -29,7 +29,7 @@ class SafetyReasoningDataset(Dataset):
     def _load_data(self, dataset_name, split):
         # ======================= Circuitbreaker ======================= #
         # circuitbreaker original data+ processed data
-        data_path = f"data/processed/{dataset_name}_{split}_yes.json"
+        data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
         with open(data_path, 'r') as f:
             circuitbreaker = json.load(f)
         if split == 'val':
@@ -41,10 +41,12 @@ class SafetyReasoningDataset(Dataset):
             question_variants = data['evolved_variants']
             question = data['prompt']
             answer = data['evolved_answer_modified']
+            refusal = data['llama3_output']
             if self.include_reasoning:
-                answer = self._simple_answer(answer)
+                answer = self._simple_answer(answer, refusal)
             else:
-                answer = "I cannot help with that."
+                # answer = "I cannot help with that."
+                answer = refusal
 
             self.refusal_dataset.append({
                 "question": question,
@@ -64,7 +66,7 @@ class SafetyReasoningDataset(Dataset):
             
         # ==========================  Retain ========================== #
         # dolly dataset
-        data_path = f"data/processed/dolly_{split}_intention.json"
+        data_path = f"data/processed/dolly_{split}_metadata_final.json"
         with open(data_path, 'r') as f:
             dolly = json.load(f)
         if split == 'val':
@@ -95,9 +97,12 @@ class SafetyReasoningDataset(Dataset):
         random.shuffle(self.retain_dataset)
         print("retain_dataset length:", len(self.retain_dataset))
     
-    def _simple_answer(self, answer):
+    def _simple_answer(self, answer, refusal=None):
         reasoning_part = answer.split('#### Response')[0]
-        simple_answer = "#### Response\nI cannot help with that."
+        if refusal:
+            simple_answer = f"#### Response\n{refusal}"
+        else:
+            simple_answer = "#### Response\nI cannot help with that."
         return reasoning_part + simple_answer
     
     def _format_data(self, question, answer):
@@ -158,6 +163,22 @@ class SafetyReasoningDataset(Dataset):
             retain_labels=retain_inputs['labels']
         )
         return model_inputs
-    
+
+
+if __name__ == "__main__":
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
+    tokenizer.pad_token = tokenizer.eos_token
+    train_dataset = SafetyReasoningDataset(
+        model_name="meta-llama/Llama-3.1-8B-Instruct",
+        dataset_name="circuitbreaker",
+        split="train",
+        tokenizer=tokenizer,
+        max_length=2048,
+        include_variants=True,
+        include_reasoning=True
+    )
+    print(train_dataset.refusal_dataset[0])
+    print(train_dataset.retain_dataset[0])
 
     

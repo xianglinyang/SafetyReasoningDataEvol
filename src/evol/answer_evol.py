@@ -53,7 +53,7 @@ def check_details_format(categories) -> str:
     details = []
     for rule in Rules:
         if rule in categories.keys():
-            current_detail = f"* {rule}: Yes. "+categories[rule]
+            current_detail = f"* {rule}: Yes, "+categories[rule]+"."
         else:
             current_detail = f"* {rule}: No."
         details.append(current_detail)

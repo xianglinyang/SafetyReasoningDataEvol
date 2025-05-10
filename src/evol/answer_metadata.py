@@ -34,7 +34,7 @@ def reformat_categories(categories):
 
 def clean_metadata(metadata):
     m = metadata[0]
-    intent = m["Intent"].replace("The core intent of the question is to ", "")
+    intent = m["Intent"].split("core intent of the question is to ")[-1]
     if intent.endswith("."):
         intent = intent[:-1]
     categories = reformat_categories(m.get("Categories", []))
