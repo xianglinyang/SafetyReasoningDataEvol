@@ -7,10 +7,9 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=8 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --nproc_per_node=4 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
---ratio 0.5 \
 --max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
@@ -40,6 +39,8 @@ base_arguments="\
 --weight_decay 0.0 \
 --logging_steps 1 \
 --remove_unused_columns False
+--include_variants 1
+--include_reasoning 1
 "
 
 # ---------dataset arguments---------

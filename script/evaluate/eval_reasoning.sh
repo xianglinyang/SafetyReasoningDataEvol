@@ -2,27 +2,31 @@
 
 # export CUDA_VISIBLE_DEVICES=0
 
-per_gpu_jobs_num=2
+per_gpu_jobs_num=1
 gpu_num=2  # number of GPUs
-jobs_num=4  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
+jobs_num=2  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
+available_gpu_ids=(6 7)
 
 model_name_or_path_list=(
-    # "outputs/circuitbreaker/llama3-8b_20250121-122232/checkpoint-625"
-    # "outputs/circuitbreaker/llama3-8b_20250121-122232/checkpoint-1248"
-    # "outputs/circuitbreaker/llama3-8b_20250121-122232/"
-    # "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-313"
-    # "outputs/circuitbreaker/mistral-7b_20250122-011012/checkpoint-624"
-    # "outputs/circuitbreaker/mistral-7b_20250122-011012/"
     # "meta-llama/Llama-3.1-8B-Instruct"
     # "mistralai/Mistral-7B-Instruct-v0.2"
+
     # "GraySwanAI/Llama-3-8B-Instruct-RR"
     # "GraySwanAI/Mistral-7B-Instruct-RR"
-    # "cais/HarmBench-Mistral-7b-val-cls"
-    # "outputs/circuitbreaker/llama3-8b_ablate_retain/checkpoint-624"
-    # "outputs/circuitbreaker/llama3-8b_ablation_variants/checkpoint-312"
-    "outputs/circuitbreaker/mistral-7b_ablation_retain/checkpoint-624"
-    "outputs/circuitbreaker/mistral-7b_ablation_variants/checkpoint-312"
 
+    # "cais/HarmBench-Mistral-7b-val-cls"
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-152"
+
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-225"
+
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
+    # "meta-llama/Meta-Llama-3-8B-Instruct"
 
 )
 dataset_name_list=(
@@ -34,7 +38,7 @@ header="python -m src.evaluate.evaluate_common_reasoning"
 base_arguments="\
 --torch_type bf16 \
 --split test \
---eval_num 300 \
+--eval_num 200 \
 --device cuda"
 
 # Counter to distribute commands across GPUs
@@ -42,7 +46,9 @@ counter=0
 
 for model_name_or_path in ${model_name_or_path_list[@]}; do
     for dataset_name in ${dataset_name_list[@]}; do
-        gpu_id=$((counter % gpu_num))
+        # gpu_id=$((counter % gpu_num))
+        # gpu_id=7
+        gpu_id=${available_gpu_ids[$((counter % gpu_num))]}
         run_id=$RANDOM
 
         CUDA_VISIBLE_DEVICES=$gpu_id $header $base_arguments \

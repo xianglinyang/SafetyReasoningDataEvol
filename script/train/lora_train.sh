@@ -10,7 +10,6 @@ ID=$RANDOM
 header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
---ratio 0.5 \
 --max_seq_length 1024 \
 --lora True \
 --lora_r 64 \

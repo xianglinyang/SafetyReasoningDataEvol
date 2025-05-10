@@ -7,19 +7,18 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=8 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --nproc_per_node=4 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
---ratio 0.5 \
 --max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
---lora_alpha 128 \
+--lora_alpha 16 \
 --lora_dropout 0.1 \
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
---per_device_train_batch_size 2 \
+--per_device_train_batch_size 1 \
 --per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
@@ -39,15 +38,16 @@ base_arguments="\
 --warmup_ratio 0.03 \
 --weight_decay 0.0 \
 --logging_steps 1 \
---remove_unused_columns False
---include_variants True
---include_reasoning 1
-"
+--remove_unused_columns False \
+--include_variants 1 \
+--include_reasoning 1 \
+--benign_lambda 1 \
+--harmful_lambda 1"
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
 model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2"
-model_name_abbr="mistral-7b"
+model_name_abbr="mistral-7b-v2"
 
 out_dir="/mnt/hdd1/ljiahao/xianglin/SCoT"
 
