@@ -196,11 +196,14 @@ def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0):
         print("*****************************\n")
 
     t1 = time.time()
+    time_spent = (t1-t0)
+    time_per_sample = time_spent / eval_num
     print('*****************************')
     logger.info(f'Generation num:{eval_num if eval_num != -1 else len(dataset)}')
     logger.info(f"Time spent: {(t1-t0)/60:.2f} minutes")
 
-    return attack_questions, questions, categories, responses
+
+    return attack_questions, questions, categories, responses, time_spent, time_per_sample
 
 
 def evaluate_jailbreak(
@@ -320,7 +323,7 @@ def main():
 
     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
     dataset = HarmfulDataset(dataset_name=dataset_name, split=split, save_dir=save_dir)
-    attack_questions, questions, categories, responses = get_completions(llm, dataset, attack_name, eval_num, direct_prompting)
+    attack_questions, questions, categories, responses, time_spent, time_per_sample = get_completions(llm, dataset, attack_name, eval_num, direct_prompting)
     eval_num = len(attack_questions)
     # release gpu memory
     del llm
@@ -338,7 +341,9 @@ def main():
         "attack_type": "prompt" if attack_name in __prompt_attacks_methods__ else "adv",
         "attack_dir": save_dir,
         "evaluation": evaluation,
-        "evaluation_date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "evaluation_date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "time_spent": time_spent,
+        "time_per_sample": time_per_sample
     }
     logger.info(f"Evaluation results: {results}")
 
