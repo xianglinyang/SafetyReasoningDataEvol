@@ -65,6 +65,7 @@ def main():
     parser.add_argument("--eval_num", type=int, default=-1)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
+    parser.add_argument("--output_dir", type=str, default="results")
     parser.add_argument("--run_id", type=str, default=None)
     args = parser.parse_args()
 
@@ -80,6 +81,7 @@ def main():
     split = args.split
     eval_num = args.eval_num
     device = args.device
+    output_dir = args.output_dir
 
     if torch_type == "bf16":
         torch_type = torch.bfloat16
@@ -94,9 +96,29 @@ def main():
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
     total_time, average_time_per_sample = evaluate_reasoning_efficiency(llm, dataset, eval_num)
 
+    logger.info("End of evaluation")
+
     logger.info("Dataset name: %s, Model name: %s, Split: %s, Eval num: %d", dataset_name, model_name_or_path, split, eval_num)
     logger.info(f"Total time: {total_time}, Average time per sample: {average_time_per_sample}")
 
+    # Save metrics to file
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(output_dir, f"efficiency_metrics_{model_name_or_path.replace('/', '-')}_{dataset_name}_{split}_{timestamp}.json")
+
+    metrics = {
+        "timestamp": timestamp,
+        "dataset_name": dataset_name,
+        "model_name_or_path": model_name_or_path,
+        "split": split,
+        "eval_num": eval_num,
+        "total_time": total_time,
+        "average_time_per_sample": average_time_per_sample
+    }
+    
+    with open(output_file, 'w') as f:
+        json.dump(metrics, f, indent=2)
+  
 
 if __name__ == "__main__":
     main()
