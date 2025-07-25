@@ -42,7 +42,7 @@ import json
 from datasets import load_dataset
 from torch.utils.data import Dataset
 
-from src.llm_zoo.api_base_models import OpenAILLM
+from src.llm_zoo.api_base_models import OpenAIModel
 
 def data_reader(dataset_name, split):
     questions = list()
@@ -357,7 +357,7 @@ def answer_cleansing_with_regex(dataset, llm_answer):
     return answer
 
 async def batch_answer_cleansing_with_llm(dataset, questions, llm_answers, llm_model_name="gpt-4.1-nano"):
-    llm = OpenAILLM(model_name=llm_model_name)
+    llm = OpenAIModel(model_name=llm_model_name)
     trigger = zero_shot_answer_trigger(dataset)
     prompt = """\
     You are a helpful assistant.
@@ -379,13 +379,13 @@ async def batch_answer_cleansing_with_llm(dataset, questions, llm_answers, llm_m
     #### Output
     """
     prompts = [prompt.format(question=question, answer=llm_answer, trigger=trigger) for question, llm_answer in zip(questions, llm_answers)]
-    responses = llm.batch_invoke(prompts)
+    responses = await llm.batch_invoke(prompts)
     return responses
 
 def answer_cleansing_with_llm(dataset, question, answer):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
     # Currently, we use 4o-mini model to extract the answer from the reasoning output
-    llm = OpenAILLM(model_name="gpt-4o-mini")
+    llm = OpenAIModel(model_name="gpt-4o-mini")
 
     prompt = f"""\
     You are a helpful assistant.

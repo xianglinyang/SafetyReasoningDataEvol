@@ -27,7 +27,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from vllm import LLM, SamplingParams
 
 from src.llm_zoo.base_model import BaseLLM
-# from src.llm_zoo.model_configs import get_system_prompt
+from src.llm_zoo.model_configs import get_formatted_prompt, get_stop_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ class HuggingFaceModel(BaseLLM):
 
 # vllm models
 class VLLMModel(BaseLLM):
-    def __init__(self, model_name: str, device: str = "cuda", torch_dtype: torch.dtype = torch.bfloat16, tensor_parallel_size: int = 1, gpu_memory_utilization: float = 0.95):
+    def __init__(self, model_name_or_path: str, device: str = "cuda", torch_dtype: torch.dtype = torch.bfloat16, tensor_parallel_size: int = 1, gpu_memory_utilization: float = 0.95):
         '''
         Args:
             model_name: str, the name of the model
@@ -96,16 +96,16 @@ class VLLMModel(BaseLLM):
             torch_dtype: torch.dtype, the dtype to use
             tensor_parallel_size: int, the number of GPUs to use
         '''
-        super().__init__(model_name)
+        super().__init__(model_name_or_path)
         self.device = device
         self.torch_dtype = torch_dtype
         self.tensor_parallel_size = tensor_parallel_size
         self.gpu_memory_utilization = gpu_memory_utilization
         
-        logger.info(f"Initializing LLM with model: {model_name}...")
+        logger.info(f"Initializing LLM with model: {model_name_or_path}...")
         time_start = time.time()
         self.llm = LLM(
-            model=model_name,
+            model=model_name_or_path,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             trust_remote_code=True, #  Needed for some models like Mistral, already default in recent vLLM
@@ -114,13 +114,14 @@ class VLLMModel(BaseLLM):
         time_end = time.time()
         logger.info(f"LLM initialization took {time_end - time_start:.2f} seconds.")
         
-    def invoke(self, prompt: str, n: int = 1) -> str:
+    def invoke(self, prompt: str, n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024) -> str:
+        stop_tokens = get_stop_tokens(self.model_name)
         sampling_params = SamplingParams(
             n=n,  # Number of output sequences to return for each prompt
-            # temperature=temperature,
-            # top_p=top_p,
-            # max_tokens=max_new_tokens,  # Maximum number of tokens to generate per output. Adjust as needed.
-            # stop=["\n\n", "---"], # Sequences at which to stop generation.
+            temperature=temperature,
+            top_p=top_p,
+            max_tokens=max_new_tokens,  # Maximum number of tokens to generate per output. Adjust as needed.
+            stop=stop_tokens, # Sequences at which to stop generation.
         )
         logger.info(f"Using sampling parameters: {sampling_params}")
 
@@ -129,19 +130,22 @@ class VLLMModel(BaseLLM):
 
         # vLLM can process a list of prompts in a batch very efficiently.
         # The `llm.generate` method takes a list of prompts and sampling parameters.
-        prompts_dataset = [prompt]
+        formatted_prompt = get_formatted_prompt(self.model_name, prompt)
+        prompts_dataset = [formatted_prompt]
         outputs = self.llm.generate(prompts_dataset, sampling_params)
 
         end_generation_time = time.time()
         logger.info(f"Generation for {len(prompts_dataset)} prompts took {end_generation_time - start_generation_time:.2f} seconds.")
         return outputs[0].outputs[0].text.strip()
     
-    def batch_invoke(self, prompts: List[str], n: int = 1) -> str:
+    def batch_invoke(self, prompts: List[str], n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024) -> str:
+        stop_tokens = get_stop_tokens(self.model_name)
         sampling_params = SamplingParams(
             n=n,  # Number of output sequences to return for each prompt
-            # temperature=temperature,
-            # top_p=top_p,
-            # stop=["\n\n", "---"], # Sequences at which to stop generation.
+            max_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=top_p,
+            stop=stop_tokens,
         )
         logger.info(f"Using sampling parameters: {sampling_params}")
 
@@ -149,8 +153,8 @@ class VLLMModel(BaseLLM):
         start_generation_time = time.time()
 
         # vLLM can process a list of prompts in a batch very efficiently.
-        # The `llm.generate` method takes a list of prompts and sampling parameters.
-        outputs = self.llm.generate(prompts, sampling_params)
+        formatted_prompts = [get_formatted_prompt(self.model_name, prompt) for prompt in prompts]
+        outputs = self.llm.generate(formatted_prompts, sampling_params)
 
         end_generation_time = time.time()
         logger.info(f"Generation for {len(prompts)} prompts took {end_generation_time - start_generation_time:.2f} seconds.")
@@ -169,9 +173,9 @@ def huggingface_test():
     print(model.invoke(prompt))
 
 def vllm_test():
-    model_name = "meta-llama/Llama-3.1-8B-Instruct"
-    model = VLLMModel(model_name, device="cuda:0", tensor_parallel_size=2, torch_dtype=torch.bfloat16)
-    prompts = ["What is the capital of France?"]*10
+    model_name = "meta-llama/Llama-3.1-8B-Instruct" 
+    model = VLLMModel(model_name, device="cuda:0", tensor_parallel_size=1, torch_dtype=torch.bfloat16)
+    prompts = ["Solve the following problem:\n\nJen got 3 fish.  They each need $1 worth of food a day.  How much does she spend on food in the month of May?"]*3
     responses = model.batch_invoke(prompts)
     print(responses)
 
