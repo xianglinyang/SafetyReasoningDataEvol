@@ -356,6 +356,31 @@ def answer_cleansing_with_regex(dataset, llm_answer):
 
     return answer
 
+async def batch_answer_cleansing_with_llm(dataset, questions, llm_answers, llm_model_name="gpt-4.1-nano"):
+    llm = OpenAILLM(model_name=llm_model_name)
+    trigger = zero_shot_answer_trigger(dataset)
+    prompt = """\
+    You are a helpful assistant.
+    Your task is to extract the student's answer according to the provided standard from a question and reasoning paragraph, or return "[INVALID]" if there is no identifiable answer in the paragraph.
+    Your SHOULD {trigger}.
+    You MUST NOT solve the problem directly.
+
+    # Steps
+    
+    1. Analyze the question and reasoning paragraph.
+    2. Check if there is a valid answer present in the reasoning paragraph.
+    3. If a valid answer is present, clean the answer to extract the relevant information according to the provided standard.
+    4. If there is no valid answer, output "[INVALID]".
+
+    #### Input
+    Question: {question}
+    Reasoning Paragraph: {answer}
+
+    #### Output
+    """
+    prompts = [prompt.format(question=question, answer=llm_answer, trigger=trigger) for question, llm_answer in zip(questions, llm_answers)]
+    responses = llm.batch_invoke(prompts)
+    return responses
 
 def answer_cleansing_with_llm(dataset, question, answer):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
@@ -384,14 +409,15 @@ def answer_cleansing_with_llm(dataset, question, answer):
     response = llm.invoke(prompt)
     return response
 
+def batch_gt_answer_cleansing(dataset, answers):
+    clean_answers = [gt_answer_cleansing(dataset, answer) for answer in answers]
+    return clean_answers
 
 def gt_answer_cleansing(dataset, answer):
     pred = answer
     if dataset in ("gsm8k"):
         pred = pred.replace(",", "")
-
     return pred
-    
 
 def zero_shot_answer_trigger(dataset):
     trigger = "The answer is"

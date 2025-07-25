@@ -14,7 +14,6 @@ alpaca
 '''
 
 import os
-import sys
 import json
 import time
 from datetime import datetime
@@ -29,32 +28,37 @@ from typing import Dict
 
 
 from src.logger.config import setup_logging
-from src.llm_zoo.code_base_models import HuggingFaceLLM
-from src.data_utils.reasoning_datasets import ReasoningDataset, gt_answer_cleansing, answer_cleansing_with_llm
+from src.llm_zoo.code_base_models import VLLMModel
+from src.data_utils.reasoning_datasets import ReasoningDataset, batch_answer_cleansing_with_llm, batch_gt_answer_cleansing
 
 logger = logging.getLogger(__name__)
 
-def process_single_evaluation(llm, dataset_name, question, gt_answer, idx):
+def process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name="gpt-4.1-nano"):
+    # 1. get the generated answers
     trigger = "Solve the following problem:\n\n"
-    llm_answer = llm.invoke(trigger + question)
-    
-    generated_answers = llm_answer.split("#### Response")
-    reasoning = generated_answers[0] if len(generated_answers) > 1 else ""
-    generated_answer = generated_answers[-1]
-    
-    logger.info(f"{idx} Question: {question}")
-    logger.info(f"[Reasoning]: {reasoning}")
-    logger.info(f"[LLM Answer]: {generated_answer}")
+    processed_questions = [trigger + question for question in questions]
+    llm_answers = llm.batch_invoke(processed_questions)
 
-    pred_answer = answer_cleansing_with_llm(dataset_name, question, generated_answer)
-    clean_answer = gt_answer_cleansing(dataset_name, gt_answer)
-    logger.info(f"[GT answer]: {clean_answer}")
-    logger.info(f"[Pred answer]: {pred_answer}")
-    logger.info(f"[Cleaning]: {clean_answer == pred_answer}")
-    
-    return int(clean_answer == pred_answer)
+    # 2. clean the generated answers
+    reasoning_list = []
+    generated_answer_list = []
+    for llm_answer in llm_answers:
+        split_llm_answer = llm_answer.split("#### Response")
+        reasoning = split_llm_answer[0] if len(split_llm_answer) > 1 else ""
+        generated_answer = split_llm_answer[-1]
+        reasoning_list.append(reasoning)
+        generated_answer_list.append(generated_answer)
 
-def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
+    # 3. clean the generated answers
+    pred_answer_list = batch_answer_cleansing_with_llm(dataset_name, questions, generated_answer_list, clean_model_name)
+    clean_answer_list = batch_gt_answer_cleansing(dataset_name, gt_answers)
+
+    # 4. calculate the accuracy
+    corrects = [clean_answer == pred_answer for clean_answer, pred_answer in zip(clean_answer_list, pred_answer_list)]
+    return corrects
+
+
+def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1, clean_model_name="gpt-4.1-nano"):
     t0 = time.time()
 
     if eval_num == -1:
@@ -65,14 +69,13 @@ def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1):
     else:
         eval_idxs = random.sample(range(len(dataset)), eval_num)
 
-    correct = [0] * len(eval_idxs)
-    
-    # Process evaluations sequentially
-    for i, idx in enumerate(tqdm(eval_idxs)):
-        question, _, answer = dataset[idx]
-        correct[i] = process_single_evaluation(llm, dataset_name, question, answer, idx)
+    questions = [dataset[idx][0] for idx in eval_idxs]
+    gt_answers = [dataset[idx][2] for idx in eval_idxs]
 
-    return sum(correct) / len(correct), time.time() - t0
+    corrects = process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name)
+
+    return sum(corrects) / len(corrects), time.time() - t0
+
 
 def evaluate_reasoning_efficiency(llm, dataset, eval_num=-1):
     if eval_num == -1:
@@ -150,8 +153,10 @@ def main():
     parser.add_argument("--split", type=str, default="test")
     parser.add_argument("--eval_num", type=int, default=-1)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--tensor_parallel_size", type=int, default=1)
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
     parser.add_argument("--run_id", type=str, default=None)
+    parser.add_argument("--llm_model_name", type=str, default="gpt-4.1-nano")
     args = parser.parse_args()
 
     setup_logging(task_name="evaluate_loss", run_id=args.run_id)
@@ -166,7 +171,8 @@ def main():
     split = args.split
     eval_num = args.eval_num
     device = args.device
-
+    tensor_parallel_size = args.tensor_parallel_size
+    clean_model_name = args.llm_model_name
     if torch_type == "bf16":
         torch_type = torch.bfloat16
     elif torch_type == "fp16":
@@ -176,9 +182,9 @@ def main():
     else:
         raise ValueError(f"Invalid torch_type: {torch_type}")
 
-    llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
+    llm = VLLMModel(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device, tensor_parallel_size=tensor_parallel_size)
     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
-    accu, elapsed_time = evaluate_reasoning(llm, dataset_name, dataset, eval_num)
+    accu, elapsed_time = evaluate_reasoning(llm, dataset_name, dataset, eval_num, clean_model_name)
 
     results = {
         "accu": accu,
@@ -186,6 +192,7 @@ def main():
         "model_name_or_path": model_name_or_path,
         "split": split,
         "eval_num": eval_num,
+        "tensor_parallel_size": tensor_parallel_size,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "elapsed_time": elapsed_time,
         "average_time_per_sample": elapsed_time / eval_num
