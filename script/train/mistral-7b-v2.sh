@@ -7,18 +7,18 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --nproc_per_node=4 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="CUDA_VISIBLE_DEVICES=6,7 torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
 --max_seq_length 1024 \
 --lora True \
 --lora_r 64 \
---lora_alpha 16 \
+--lora_alpha 64 \
 --lora_dropout 0.1 \
 --lora_target_modules q_proj k_proj v_proj o_proj \
 --use_fast_tokenizer True \
 --learning_rate 2e-05 \
---per_device_train_batch_size 1 \
+--per_device_train_batch_size 2 \
 --per_device_eval_batch_size 2 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
@@ -54,7 +54,8 @@ out_dir="/mnt/hdd1/ljiahao/xianglin/SCoT"
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do
     # output dir format with model name+date+time
-    output_dir="${out_dir}/${dataset_name}/${model_name_abbr}_$(date +%Y%m%d-%H%M%S)"
+    # output_dir="${out_dir}/${dataset_name}/${model_name_abbr}_$(date +%Y%m%d-%H%M%S)"
+    output_dir="${out_dir}/${dataset_name}/${model_name_abbr}-alpha64"
     if [[ ! -d $output_dir ]]; then
         mkdir -p $output_dir
     fi

@@ -1,11 +1,9 @@
 #!/bin/bash
 
-# export CUDA_VISIBLE_DEVICES=0
-
 per_gpu_jobs_num=1
-gpu_num=2  # number of GPUs
-jobs_num=2  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
-available_gpu_ids=(6 7)
+gpu_num=1  # number of GPUs
+jobs_num=$((per_gpu_jobs_num*gpu_num))  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
+available_gpu_ids=(4)
 
 model_name_or_path_list=(
     # "meta-llama/Llama-3.1-8B-Instruct"
@@ -14,8 +12,8 @@ model_name_or_path_list=(
     # "GraySwanAI/Llama-3-8B-Instruct-RR"
     # "GraySwanAI/Mistral-7B-Instruct-RR"
 
-    # "cais/HarmBench-Mistral-7b-val-cls"
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-152"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873"
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
 
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
@@ -38,7 +36,7 @@ header="python -m src.evaluate.evaluate_common_reasoning"
 base_arguments="\
 --torch_type bf16 \
 --split test \
---eval_num 200 \
+--eval_num 50 \
 --device cuda"
 
 # Counter to distribute commands across GPUs
