@@ -67,7 +67,6 @@ def main():
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
     parser.add_argument("--output_dir", type=str, default="results")
     parser.add_argument("--run_id", type=str, default=None)
-    parser.add_argument("--output_dir", type=str, default="results")
     args = parser.parse_args()
 
     setup_logging(task_name="evaluate_loss_efficiency", run_id=args.run_id)
@@ -82,7 +81,7 @@ def main():
     split = args.split
     eval_num = args.eval_num
     device = args.device
-    output_dir = args.output_dir    output_dir = args.output_dir
+    output_dir = args.output_dir
 
     if torch_type == "bf16":
         torch_type = torch.bfloat16
