@@ -154,13 +154,14 @@ def llamaguard3_judge_fn(prompts: List[str], responses: List[str], device: str="
 # ------------------------------------utils------------------------------------
 ##############################################################################################
 
-def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0):
+def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0, return_reasoning=False):
     logger.info(f"Getting completions for {attack_name} attack")
     attack_questions = []
     questions = []
     categories = []
     responses = []
     attack_fn = get_attack_fn(attack_name)
+    reasonings = []
 
     t0 = time.time()
 
@@ -180,6 +181,12 @@ def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0):
             ins = get_direct_prompting_fn(direct_prompting)
             attack_question = ins.format(question=attack_question)
         llm_answer = llm.invoke(attack_question)
+
+        if "#### Response" in llm_answer:
+            reasoning = llm_answer.split("#### Response")[0].strip()
+            reasonings.append(reasoning)
+        else:
+            reasonings.append("")
 
         answer = llm_answer.split("#### Response")[-1].strip()
         attack_questions.append(attack_question)
@@ -202,8 +209,10 @@ def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0):
     logger.info(f'Generation num:{eval_num if eval_num != -1 else len(dataset)}')
     logger.info(f"Time spent: {(t1-t0)/60:.2f} minutes")
 
-
-    return attack_questions, questions, categories, responses, time_spent, time_per_sample
+    if return_reasoning:
+        return attack_questions, questions, categories, responses, reasonings, time_spent, time_per_sample
+    else:
+        return attack_questions, questions, categories, responses, time_spent, time_per_sample
 
 
 def evaluate_jailbreak(
