@@ -160,7 +160,12 @@ def data_reader(dataset_name, split, save_dir=None):
         with open(save_dir, 'r') as f:
             data = json.load(f)
         for key, value in data.items():
-            questions.append(value[0])
+            if type(value[0]) == list:
+                questions.extend(value[0])
+            elif type(value[0]) == str:
+                questions.append(value[0])
+            else:
+                raise ValueError(f"Unknown data type: {type(value[0])}")
     elif dataset_name == "xstest":
         assert split in ["safe", "unsafe"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("walledai/XSTest")
