@@ -67,6 +67,7 @@ def main():
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
     parser.add_argument("--output_dir", type=str, default="results")
     parser.add_argument("--run_id", type=str, default=None)
+    parser.add_argument("--output_dir", type=str, default="results")
     args = parser.parse_args()
 
     setup_logging(task_name="evaluate_loss_efficiency", run_id=args.run_id)
@@ -81,7 +82,7 @@ def main():
     split = args.split
     eval_num = args.eval_num
     device = args.device
-    output_dir = args.output_dir
+    output_dir = args.output_dir    output_dir = args.output_dir
 
     if torch_type == "bf16":
         torch_type = torch.bfloat16
@@ -97,6 +98,19 @@ def main():
     total_time, average_time_per_sample = evaluate_reasoning_efficiency(llm, dataset, eval_num)
 
     logger.info("End of evaluation")
+
+    metrics = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "dataset_name": dataset_name,
+        "model_name_or_path": model_name_or_path,
+        "split": split,
+        "eval_num": eval_num,
+        "total_time": total_time,
+        "average_time_per_sample": average_time_per_sample
+    }
+
+    with open(os.path.join(output_dir, f"{dataset_name}_{model_name_or_path}_{split}_{eval_num}.json"), "w") as f:
+        json.dump(metrics, f)
 
     logger.info("Dataset name: %s, Model name: %s, Split: %s, Eval num: %d", dataset_name, model_name_or_path, split, eval_num)
     logger.info(f"Total time: {total_time}, Average time per sample: {average_time_per_sample}")
