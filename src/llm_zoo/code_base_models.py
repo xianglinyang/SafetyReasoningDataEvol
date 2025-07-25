@@ -18,24 +18,26 @@ Qwen/Qwen2.5-7B-Instruct
 '''
 
 import os
+import asyncio
+import time
 import torch
 import logging
-from tqdm import tqdm
+from typing import List
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import PeftModel, LoraConfig
+from vllm import LLM, SamplingParams
 
 from src.llm_zoo.base_model import BaseLLM
-from src.llm_zoo.model_configs import get_system_prompt
+# from src.llm_zoo.model_configs import get_system_prompt
 
 logger = logging.getLogger(__name__)
 
-class HuggingFaceLLM(BaseLLM):
-    def __init__(self, model_name_or_path="meta-llama/Llama-2-7b-chat-hf", torch_dtype=torch.bfloat16, device="cuda"):
-        super().__init__(model_name_or_path)
+# HuggingFace models
+class HuggingFaceModel(BaseLLM):
+    def __init__(self, model_name_or_path, torch_dtype=torch.bfloat16, device="cuda", **kwargs):
+        super().__init__(model_name_or_path, **kwargs)
         self.model_name_or_path=model_name_or_path
         self.torch_dtype=torch_dtype
         self.device=device
-        self.system_prompt = get_system_prompt(model_name_or_path)
         self._load_tokenizer()
         self._load_model()
 
@@ -49,55 +51,132 @@ class HuggingFaceLLM(BaseLLM):
         self.tokenizer.padding_side = "left"
 
     def _load_model(self):
-        # is_peft = os.path.exists(os.path.join(self.model_name_or_path, "adapter_config.json"))
-        # if is_peft:
-        #     logger.info("Loading LoRA model from {}".format(self.model_name_or_path))
-        #     # load this way to make sure that optimizer states match the model structure
-        #     config = LoraConfig.from_pretrained(self.model_name_or_path)
-        #     base_model = AutoModelForCausalLM.from_pretrained(
-        #         config.base_model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
-        #     self.model = PeftModel.from_pretrained(
-        #         base_model, self.model_name_or_path, device_map=self.device)
-        # else:
-        logger.info(f"Loading base model from {self.model_name_or_path}")
         self.model = AutoModelForCausalLM.from_pretrained(
             pretrained_model_name_or_path=self.model_name_or_path, torch_dtype=self.torch_dtype, device_map=self.device)
-        print("model loaded")
+        logger.info("model loaded")
 
-    def prompt2messages(self, prompt):
-        messages = list()
-        if self.system_prompt is not None:
-            messages.append({"role": "system", "content": self.system_prompt})
+    def invoke(self, prompt, system_prompt: str = None, verbose=False):
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
-        return messages
-
-    def invoke(self, prompt, max_new_tokens=2048, temperature=0.1, verbose=False):
-        messages = self.prompt2messages(prompt)
+        
         prompt = self.tokenizer.apply_chat_template(messages, tokenize=False)
         
         # 3: Tokenize the chat (This can be combined with the previous step using tokenize=True)
         inputs = self.tokenizer(prompt, return_tensors="pt", add_special_tokens=False)
         # Move the tokenized inputs to the same device the model is on (GPU/CPU)
         inputs = {key: tensor.to(self.model.device) for key, tensor in inputs.items()}
-        if verbose: print("Tokenized inputs:\n", inputs)
+        if verbose: logger.info(f"Tokenized inputs:\n{inputs}")
         
         # 4: Generate text from the model
-        outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens, temperature=temperature)
-        if verbose: print("Generated tokens:\n", outputs)
+        outputs = self.model.generate(**inputs, do_sample=True)
+        if verbose: logger.info(f"Generated tokens:\n{outputs}")
 
         # 5: Decode the output back to a string
         decoded_output = self.tokenizer.decode(outputs[0][inputs['input_ids'].size(1):], skip_special_tokens=True)
-        if verbose: print("Decoded output:\n", decoded_output)
+        if verbose: logger.info(f"Decoded output:\n{decoded_output}")
         
         return decoded_output
+    
+    def batch_invoke(self, prompts: List[str], system_prompt: str = None, verbose=False):
+        responses = list()
+        for prompt in prompts:
+            response = self.invoke(prompt, system_prompt, verbose)
+            responses.append(response)
+        return responses
+
+# vllm models
+class VLLMModel(BaseLLM):
+    def __init__(self, model_name: str, device: str = "cuda", torch_dtype: torch.dtype = torch.bfloat16, tensor_parallel_size: int = 1, gpu_memory_utilization: float = 0.95):
+        '''
+        Args:
+            model_name: str, the name of the model
+            device: str, the device to use
+            torch_dtype: torch.dtype, the dtype to use
+            tensor_parallel_size: int, the number of GPUs to use
+        '''
+        super().__init__(model_name)
+        self.device = device
+        self.torch_dtype = torch_dtype
+        self.tensor_parallel_size = tensor_parallel_size
+        self.gpu_memory_utilization = gpu_memory_utilization
+        
+        logger.info(f"Initializing LLM with model: {model_name}...")
+        time_start = time.time()
+        self.llm = LLM(
+            model=model_name,
+            tensor_parallel_size=tensor_parallel_size,
+            gpu_memory_utilization=gpu_memory_utilization,
+            trust_remote_code=True, #  Needed for some models like Mistral, already default in recent vLLM
+            dtype=self.torch_dtype, # or "bfloat16" if supported and desired. "auto" by default.
+        )
+        time_end = time.time()
+        logger.info(f"LLM initialization took {time_end - time_start:.2f} seconds.")
+        
+    def invoke(self, prompt: str, n: int = 1) -> str:
+        sampling_params = SamplingParams(
+            n=n,  # Number of output sequences to return for each prompt
+            # temperature=temperature,
+            # top_p=top_p,
+            # max_tokens=max_new_tokens,  # Maximum number of tokens to generate per output. Adjust as needed.
+            # stop=["\n\n", "---"], # Sequences at which to stop generation.
+        )
+        logger.info(f"Using sampling parameters: {sampling_params}")
+
+        logger.info("\nGenerating responses...")
+        start_generation_time = time.time()
+
+        # vLLM can process a list of prompts in a batch very efficiently.
+        # The `llm.generate` method takes a list of prompts and sampling parameters.
+        prompts_dataset = [prompt]
+        outputs = self.llm.generate(prompts_dataset, sampling_params)
+
+        end_generation_time = time.time()
+        logger.info(f"Generation for {len(prompts_dataset)} prompts took {end_generation_time - start_generation_time:.2f} seconds.")
+        return outputs[0].outputs[0].text.strip()
+    
+    def batch_invoke(self, prompts: List[str], n: int = 1) -> str:
+        sampling_params = SamplingParams(
+            n=n,  # Number of output sequences to return for each prompt
+            # temperature=temperature,
+            # top_p=top_p,
+            # stop=["\n\n", "---"], # Sequences at which to stop generation.
+        )
+        logger.info(f"Using sampling parameters: {sampling_params}")
+
+        logger.info("\nGenerating responses...")
+        start_generation_time = time.time()
+
+        # vLLM can process a list of prompts in a batch very efficiently.
+        # The `llm.generate` method takes a list of prompts and sampling parameters.
+        outputs = self.llm.generate(prompts, sampling_params)
+
+        end_generation_time = time.time()
+        logger.info(f"Generation for {len(prompts)} prompts took {end_generation_time - start_generation_time:.2f} seconds.")
+        
+        # Process and display results
+        results = [output.outputs[0].text.strip() for output in outputs]
+        logger.info("\nProcessing complete.")
+
+        return results
 
 
-def main():
+def huggingface_test():
     model_path = "meta-llama/Llama-3.1-8B-Instruct"
-    model = HuggingFaceLLM(model_name_or_path=model_path, device="cuda:0", torch_dtype=torch.bfloat16)
+    model = HuggingFaceModel(model_name_or_path=model_path, device="cuda:0", torch_dtype=torch.bfloat16)
     prompt = "What is the capital of France?"
     print(model.invoke(prompt))
 
+def vllm_test():
+    model_name = "meta-llama/Llama-3.1-8B-Instruct"
+    model = VLLMModel(model_name, device="cuda:0", tensor_parallel_size=2, torch_dtype=torch.bfloat16)
+    prompts = ["What is the capital of France?"]*10
+    responses = model.batch_invoke(prompts)
+    print(responses)
+
+
 # test function
 if __name__ == "__main__":
-    main()
+    # huggingface_test()
+    vllm_test()
