@@ -7,10 +7,10 @@
 
 # ---------base arguments---------
 ID=$RANDOM
-header="torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
+header="torchrun --nproc_per_node=8 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.sft"
 
 base_arguments="\
---max_seq_length 1024 \
+--max_seq_length 2048 \
 --lora True \
 --lora_r 64 \
 --lora_alpha 128 \
@@ -20,7 +20,7 @@ base_arguments="\
 --learning_rate 2e-05 \
 --gradient_accumulation_steps 16 \
 --optim adamw_torch \
---num_train_epochs 2 \
+--num_train_epochs 3 \
 --torch_dtype bfloat16 \
 --bf16 True \
 --tf32 False \
@@ -38,17 +38,17 @@ base_arguments="\
 --weight_decay 0.0 \
 --logging_steps 1 \
 --remove_unused_columns False
---include_variants True
---include_reasoning 0
+--include_variants 1
+--include_reasoning 1
 "
 
 # ---------dataset arguments---------
 dataset_names=("circuitbreaker")
-model_name_or_paths=("meta-llama/Llama-3.1-8B-Instruct" "mistralai/Mistral-7B-Instruct-v0.2")
-model_name_abbrs=("llama3-8b" "mistral-7b")
-per_device_train_batch_size=(1 1)
+model_name_or_paths=("meta-llama/Llama-2-13b-chat-hf")
+model_name_abbrs=("llama2-13b")
+per_device_train_batch_size=(1)
 
-out_dir="/data2/xianglin/SCoT/outputs"
+out_dir="/mnt/ljiahao/xianglin/SCoT/outputs"
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do

@@ -1,16 +1,18 @@
 #!/bin/bash
 
 per_gpu_jobs_num=1
-gpu_num=1  # number of GPUs
+gpu_num=5  # number of GPUs
 jobs_num=$((per_gpu_jobs_num*gpu_num))  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
-available_gpu_ids=(4)
+available_gpu_ids=(0 2 3 5 6)
 
 model_name_or_path_list=(
-    # "meta-llama/Llama-3.1-8B-Instruct"
-    # "mistralai/Mistral-7B-Instruct-v0.2"
+    "meta-llama/Llama-3.1-8B-Instruct"
+    "mistralai/Mistral-7B-Instruct-v0.2"
 
-    # "GraySwanAI/Llama-3-8B-Instruct-RR"
-    # "GraySwanAI/Mistral-7B-Instruct-RR"
+    "GraySwanAI/Llama-3-8B-Instruct-RR"
+    "GraySwanAI/Mistral-7B-Instruct-RR"
+
+    "cais/zephyr_7b_r2d2"
 
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873"
     "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
@@ -20,7 +22,7 @@ model_name_or_path_list=(
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-225"
 
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
@@ -28,15 +30,22 @@ model_name_or_path_list=(
 
 )
 dataset_name_list=(
-    "mmlu"
-    "gsm8k"
+    # "mmlu"
+    # "gsm8k"
+    "arc-c"
+    "arc-e"
+    "boolq"
+    "MMLU-STEM"
+    "sciq"
+    # "SimpleQA"
+    "adv_glue"
 )
 
 header="python -m src.evaluate.evaluate_common_reasoning"
 base_arguments="\
 --torch_type bf16 \
 --split test \
---eval_num 50 \
+--eval_num 90000 \
 --device cuda"
 
 # Counter to distribute commands across GPUs

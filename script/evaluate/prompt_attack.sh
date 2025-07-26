@@ -1,8 +1,8 @@
 #!/bin/bash
 per_gpu_jobs_num=1
-gpu_num=1
+gpu_num=8
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(0)
+gpu_ids=(0 1 2 3 4 5 6 7)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -10,23 +10,23 @@ gpu_ids=(0)
 gpu_setup="single"
 
 model_name_or_path_list=(
-    # "meta-llama/Llama-3.1-8B-Instruct"
-    # "mistralai/Mistral-7B-Instruct-v0.2"
+    "meta-llama/Llama-3.1-8B-Instruct"
+    "mistralai/Mistral-7B-Instruct-v0.2"
 
-    # "GraySwanAI/Llama-3-8B-Instruct-RR"
-    # "GraySwanAI/Mistral-7B-Instruct-RR"
+    "GraySwanAI/Llama-3-8B-Instruct-RR"
+    "GraySwanAI/Mistral-7B-Instruct-RR"
 
-    # "cais/zephyr_7b_r2d2"
+    "cais/zephyr_7b_r2d2"
 
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873" # reasoning ablation
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
 
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-225"
 
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
@@ -34,11 +34,20 @@ model_name_or_path_list=(
 )
 dataset_name_list=(
     # "sorrybench"
-    # "jailbreakbench"
     # "advbench"
     # "harmbench"
-    "harmbench_attack"
+    # "harmbench_attack"
+    
     # "xstest"
+    # "jailbreakbench"
+    # "StrongREJECT"
+    # "Stereotype"
+    # "CSRT"
+
+    "wildjailbreak"
+    "XSafety"
+    "PolyGuardMix"
+
 )
 attack_name_list=(
     "none"
@@ -54,7 +63,8 @@ attack_name_list=(
     # "poems"
 )
 
-# splits=(
+splits=(
+    "train"
 #     "logical_appeal"
 #     "uncommon_dialects"
 #     "role_play"
@@ -77,7 +87,7 @@ attack_name_list=(
 #     "translate-zh-cn"
 #     "translate-ml"
 #     "translate-ta"
-# )
+)
 
 save_dir_list=(
     # # llama3 8b
@@ -135,17 +145,16 @@ save_dir_list=(
     # "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/llama3_8b_variants_ablation/test_cases.json"
     # "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/mistral_7b_v2_scot_alpha64/test_cases.json"
     # "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/mistral_7b_v2_scot_CR_CoT_ablation/test_cases.json"
-    "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/mistral_7b_v2_scot_variants_ablation/test_cases.json"
-    # None
+    # "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/mistral_7b_v2_scot_variants_ablation/test_cases.json"
+    None
 )
 
-splits=("train")
 # prompt_cot_list=(1 2 3)
 prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 50"
+--eval_num 90000"
 
 # Counter to distribute commands across GPUs
 counter=0
@@ -159,7 +168,7 @@ for save_dir in ${save_dir_list[@]}; do
                         # Calculate GPU IDs based on setup
                         if [ "$gpu_setup" = "single" ]; then
                             gpu_id=${gpu_ids[$((counter % gpu_num))]}
-                            device_args="--device cuda:0 --eval_device cuda:0"
+                            device_args="--device cuda --eval_device cuda"
                             cuda_visible_devices=$gpu_id
                         else
                             # For dual setup, use two consecutive GPUs
@@ -198,36 +207,4 @@ for save_dir in ${save_dir_list[@]}; do
     done
 done
 
-# Wait for any remaining background jobs
 wait
-
-# # --- Generate commands for GNU Parallel ---
-# declare -a commands
-# counter=0
-# for split in "${splits[@]}"; do
-#     for model_name_or_path in "${model_name_or_path_list[@]}"; do
-#         for dataset_name in "${dataset_name_list[@]}"; do
-#             for attack_name in "${attack_name_list[@]}"; do
-#                 gpu_id=$((counter % gpu_num))
-#                 run_id=$RANDOM
-
-#                 # Build the command string, ensuring proper quoting
-#                 cmd="CUDA_VISIBLE_DEVICES=$gpu_id $header $base_arguments \
-#                     --split ${split} \
-#                     --model_name_or_path ${model_name_or_path} \
-#                     --dataset_name ${dataset_name} \
-#                     --attack_name ${attack_name} \
-#                     --prompt_cot ${prompt_cot} \
-#                     --run_id $run_id"
-
-#                 commands+=("$cmd") # Add command to an array
-#                 counter=$((counter + 1))
-#             done
-#         done
-#     done
-# done
-
-# # --- Execute using GNU Parallel ---
-# echo "Running ${#commands[@]} commands with max $jobs_num parallel jobs..."
-
-# printf '%s\n' "${commands[@]}" | parallel -j $jobs_num --eta --progress --halt now,fail=1
