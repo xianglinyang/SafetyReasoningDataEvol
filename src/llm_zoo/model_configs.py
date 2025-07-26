@@ -42,7 +42,7 @@ def get_stop_tokens(model_name_or_path):
     model_name_lower = model_name_or_path.lower()
     if "llama-3" in model_name_lower or "llama3" in model_name_lower:
         return [LLAMA3_END_OF_TEXT]
-    elif "mistral-7" in model_name_lower or "mistral" in model_name_lower:
+    elif "mistral-7" in model_name_lower or "mistral" in model_name_lower or "zephyr_7b_r2d2" in model_name_lower:
         return [MISTRAL_END_OF_TEXT]
     elif "llama-2" in model_name_lower or "llama2" in model_name_lower:
         return [LLAMA2_END_OF_TEXT]
@@ -55,6 +55,8 @@ def get_formatted_prompt(model_name_or_path, prompt):
     if "llama-3" in model_name_lower or "llama3" in model_name_lower:
         return LLAMA3_FORMATTED_PROMPT.format(prompt=prompt)
     elif "mistral-7" in model_name_lower or "mistral" in model_name_lower:
+        return MISTRAL_FORMATTED_PROMPT.format(prompt=prompt)
+    elif "zephyr_7b_r2d2" in model_name_lower:
         return MISTRAL_FORMATTED_PROMPT.format(prompt=prompt)
     elif "llama-2" in model_name_lower or "llama2" in model_name_lower:
         return LLAMA2_FORMATTED_PROMPT.format(prompt=prompt)
