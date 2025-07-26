@@ -576,7 +576,7 @@ def zero_shot_answer_trigger(dataset):
         trigger = "return the answer (Yes or No)"
     elif dataset in ("bigbench_date"):
         trigger = "return only ONE CHARACTER (among A through F) as the answer"
-    elif dataset in ("object_tracking"):
+    elif dataset in ("object_tracking", "boolq", "adv_glue"):
         trigger = "return only ONE CHARACTER (among A through C) as the answer" 
     elif dataset in ("SimpleQA"):
         trigger = "return the concise answer"
