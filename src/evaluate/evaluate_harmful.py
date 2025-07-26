@@ -615,7 +615,7 @@ def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0, 
         ins = get_direct_prompting_fn(direct_prompting)
         attack_questions = [ins.format(question=attack_question) for attack_question in attack_questions]
     
-    llm_answers = llm.batch_invoke(attack_questions)
+    llm_answers, latency_metrics = llm.batch_invoke(attack_questions, return_latency=True)
 
     reasonings = []
     responses = []
@@ -626,17 +626,10 @@ def get_completions(llm, dataset, attack_name, eval_num=-1, direct_prompting=0, 
         reasonings.append(reasoning)
         responses.append(answer)
 
-    t1 = time.time()
-    time_spent = (t1-t0)
-    time_per_sample = time_spent / actual_eval_num
-    print('*****************************')
-    logger.info(f'Generation num:{actual_eval_num}')
-    logger.info(f"Time spent: {(t1-t0)/60:.2f} minutes")
-
     if return_reasoning:
-        return attack_questions, questions, categories, responses, reasonings, time_spent, time_per_sample
+        return attack_questions, questions, categories, responses, reasonings, latency_metrics
     else:
-        return attack_questions, questions, categories, responses, time_spent, time_per_sample
+        return attack_questions, questions, categories, responses, latency_metrics
 
 
 def evaluate_jailbreak(
@@ -773,7 +766,7 @@ def main():
 
     llm = VLLMModel(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device, tensor_parallel_size=tensor_parallel_size)
     dataset = HarmfulDataset(dataset_name=dataset_name, split=split, save_dir=save_dir)
-    attack_questions, questions, categories, responses, time_spent, time_per_sample = get_completions(llm, dataset, attack_name, eval_num, direct_prompting)
+    attack_questions, questions, categories, responses, latency_metrics = get_completions(llm, dataset, attack_name, eval_num, direct_prompting)
     eval_num = len(attack_questions)
     # release gpu memory
     del llm
@@ -792,8 +785,7 @@ def main():
         "attack_dir": save_dir,
         "evaluation": evaluation,
         "evaluation_date_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "time_spent": time_spent,
-        "time_per_sample": time_per_sample
+        "latency_metrics": latency_metrics,
     }
     logger.info(f"Evaluation results: {results}")
 

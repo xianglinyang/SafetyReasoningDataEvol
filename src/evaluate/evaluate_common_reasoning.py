@@ -42,7 +42,7 @@ async def process_evaluation(llm, dataset_name, questions, gt_answers, clean_mod
     print(processed_questions[:3])
     
     try:
-        llm_answers = llm.batch_invoke(processed_questions)
+        llm_answers, latency_metrics = llm.batch_invoke(processed_questions, return_latency=True)
     except Exception as e:
         logger.error(f"Error during LLM batch invocation: {e}")
         return [False] * len(questions)  # Return all False if LLM fails
@@ -79,7 +79,7 @@ async def process_evaluation(llm, dataset_name, questions, gt_answers, clean_mod
 
     # 4. calculate the accuracy
     corrects = [clean_answer == pred_answer for clean_answer, pred_answer in zip(clean_answer_list, pred_answer_list)]
-    return corrects
+    return corrects, latency_metrics
 
 
 async def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1, clean_model_name="gpt-4.1-nano"):
@@ -94,35 +94,13 @@ async def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1, clean_mode
     questions = [dataset[idx][0] for idx in eval_idxs]
     gt_answers = [dataset[idx][2] for idx in eval_idxs]
 
-    corrects = await process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name)
+    corrects, latency_metrics = await process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name)
 
     # Fix division by zero issue
     if not corrects:
         return 0.0
-    return sum(corrects) / len(corrects)
+    return sum(corrects) / len(corrects), latency_metrics
 
-
-def evaluate_reasoning_efficiency(llm, dataset, eval_num=-1):
-    if eval_num == -1:
-        eval_idxs = list(range(len(dataset)))
-    elif eval_num > len(dataset):
-        eval_idxs = list(range(len(dataset)))
-        eval_num = len(dataset)
-    else:
-        eval_idxs = random.sample(range(len(dataset)), eval_num)
-    
-    # Process evaluations sequentially
-    t0 = time.time()
-    for i, idx in enumerate(tqdm(eval_idxs)):
-        question, _, answer = dataset[idx]
-        trigger = "Solve the following problem:\n\n"
-        llm.invoke(trigger + question)
-    t1 = time.time()
-
-    total_time = t1 - t0
-    average_time_per_sample = total_time / eval_num
-
-    return total_time, average_time_per_sample
 
 def save_results(results: Dict, path="eval_results"):
     if not os.path.exists(path):
@@ -218,9 +196,7 @@ async def main():
     else:
         actual_eval_num = eval_num
     
-    t0 = time.time()
-    accu = await evaluate_reasoning(llm, dataset_name, dataset, eval_num, clean_model_name)
-    elapsed_time = time.time() - t0
+    accu, latency_metrics = await evaluate_reasoning(llm, dataset_name, dataset, eval_num, clean_model_name)
 
     results = {
         "accu": accu,
@@ -230,52 +206,11 @@ async def main():
         "eval_num": actual_eval_num,
         "tensor_parallel_size": tensor_parallel_size,
         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "elapsed_time": elapsed_time,
-        "average_time_per_sample": elapsed_time / actual_eval_num if actual_eval_num > 0 else 0
+        "latency_metrics": latency_metrics,
     }
     logger.info(f"Evaluation results: {results}")
     save_results(results)
     print("End of evaluation")
-
-# def evaluate_reasoning_efficiency_main():
-#     parser = argparse.ArgumentParser()
-#     parser.add_argument("--model_name_or_path", type=str)
-#     parser.add_argument("--dataset_name", type=str, default="gsm8k")
-#     parser.add_argument("--split", type=str, default="test")
-#     parser.add_argument("--eval_num", type=int, default=-1)
-#     parser.add_argument("--device", type=str, default="cuda")
-#     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
-#     parser.add_argument("--run_id", type=str, default=None)
-#     args = parser.parse_args()
-
-#     setup_logging(task_name="evaluate_loss_efficiency", run_id=args.run_id)
-
-#     # log the args
-#     logger.info(f"Arguments: {args}")
-
-#     # read args
-#     model_name_or_path = args.model_name_or_path
-#     torch_type = args.torch_type
-#     dataset_name = args.dataset_name
-#     split = args.split
-#     eval_num = args.eval_num
-#     device = args.device
-
-#     if torch_type == "bf16":
-#         torch_type = torch.bfloat16
-#     elif torch_type == "fp16":
-#         torch_type = torch.float16
-#     elif torch_type == "fp32":
-#         torch_type = torch.float32
-#     else:
-#         raise ValueError(f"Invalid torch_type: {torch_type}")
-
-#     llm = HuggingFaceLLM(model_name_or_path=model_name_or_path, torch_dtype=torch_type, device=device)
-#     dataset = ReasoningDataset(dataset_name=dataset_name, split=split)
-#     total_time, average_time_per_sample = evaluate_reasoning_efficiency(llm, dataset, eval_num)
-
-#     logger.info("Dataset name: %s, Model name: %s, Split: %s, Eval num: %d", dataset_name, model_name_or_path, split, eval_num)
-#     logger.info(f"Total time: {total_time}, Average time per sample: {average_time_per_sample}")
 
 
 if __name__ == "__main__":

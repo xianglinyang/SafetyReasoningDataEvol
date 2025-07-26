@@ -15,6 +15,8 @@ meta-llama/Llama-2-13b-hf
 mistralai/Mistral-7B-Instruct-v0.1
 
 Qwen/Qwen2.5-7B-Instruct
+
+count the latency and token usage as well
 '''
 
 import os
@@ -26,6 +28,7 @@ from typing import List
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from vllm import LLM, SamplingParams
 
+from src.logger.config import setup_logging
 from src.llm_zoo.base_model import BaseLLM
 from src.llm_zoo.model_configs import get_formatted_prompt, get_stop_tokens
 
@@ -113,8 +116,49 @@ class VLLMModel(BaseLLM):
         )
         time_end = time.time()
         logger.info(f"LLM initialization took {time_end - time_start:.2f} seconds.")
+    
+    def get_latency(self, outputs):
+        total_latency_list = []
+        prompt_eval_latency_list = []
+        first_token_latency_list = []
+        sample_latency_list = []
+        tokens_per_millisecond_list = []
         
-    def invoke(self, prompt: str, n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024) -> str:
+        for i, output in enumerate(outputs):
+            # Debug: Check if metrics exist
+            if not hasattr(output, 'metrics') or output.metrics is None:
+                logger.warning(f"Output {i} has no metrics available")
+                continue
+                
+            try:
+                # Access vLLM's built-in metrics (in seconds, convert to milliseconds)
+                total_latency_list.append(output.metrics.total_latency * 1000)
+                prompt_eval_latency_list.append(output.metrics.prompt_eval_latency * 1000)
+                first_token_latency_list.append(output.metrics.first_token_latency * 1000)
+                sample_latency_list.append(output.metrics.sample_latency * 1000)
+                
+                num_generated_tokens = len(output.outputs[0].token_ids)
+                if output.metrics.sample_latency > 0:
+                    tokens_per_second = num_generated_tokens / output.metrics.sample_latency
+                    tokens_per_millisecond_list.append(tokens_per_second)
+                    
+            except AttributeError as e:
+                logger.warning(f"Could not access metrics for output {i}: {e}")
+                continue
+                
+        logger.info(f"Processed {len(total_latency_list)} outputs with metrics out of {len(outputs)} total outputs")
+        
+        return {
+            "avg_total_latency": sum(total_latency_list) / len(total_latency_list) if total_latency_list else 0,
+            "avg_prompt_eval_latency": sum(prompt_eval_latency_list) / len(prompt_eval_latency_list) if prompt_eval_latency_list else 0,
+            "avg_first_token_latency": sum(first_token_latency_list) / len(first_token_latency_list) if first_token_latency_list else 0,
+            "avg_sample_latency": sum(sample_latency_list) / len(sample_latency_list) if sample_latency_list else 0,
+            "avg_tokens_per_millisecond": sum(tokens_per_millisecond_list) / len(tokens_per_millisecond_list) if tokens_per_millisecond_list else 0,
+            "num_outputs_with_metrics": len(total_latency_list),
+            "total_outputs": len(outputs),
+        }
+        
+    def invoke(self, prompt: str, n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024, return_latency: bool = False) -> str:
         stop_tokens = get_stop_tokens(self.model_name)
         sampling_params = SamplingParams(
             n=n,  # Number of output sequences to return for each prompt
@@ -126,7 +170,6 @@ class VLLMModel(BaseLLM):
         logger.info(f"Using sampling parameters: {sampling_params}")
 
         logger.info("\nGenerating responses...")
-        start_generation_time = time.time()
 
         # vLLM can process a list of prompts in a batch very efficiently.
         # The `llm.generate` method takes a list of prompts and sampling parameters.
@@ -134,11 +177,14 @@ class VLLMModel(BaseLLM):
         prompts_dataset = [formatted_prompt]
         outputs = self.llm.generate(prompts_dataset, sampling_params)
 
-        end_generation_time = time.time()
-        logger.info(f"Generation for {len(prompts_dataset)} prompts took {end_generation_time - start_generation_time:.2f} seconds.")
+        latency_metrics = self.get_latency(outputs)
+        logger.info(f"Latency metrics: {latency_metrics}")
+
+        if return_latency:
+            return outputs[0].outputs[0].text.strip(), latency_metrics
         return outputs[0].outputs[0].text.strip()
     
-    def batch_invoke(self, prompts: List[str], n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024) -> str:
+    def batch_invoke(self, prompts: List[str], n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024, return_latency: bool = False) -> str:
         stop_tokens = get_stop_tokens(self.model_name)
         sampling_params = SamplingParams(
             n=n,  # Number of output sequences to return for each prompt
@@ -150,19 +196,33 @@ class VLLMModel(BaseLLM):
         logger.info(f"Using sampling parameters: {sampling_params}")
 
         logger.info("\nGenerating responses...")
-        start_generation_time = time.time()
-
         # vLLM can process a list of prompts in a batch very efficiently.
         formatted_prompts = [get_formatted_prompt(self.model_name, prompt) for prompt in prompts]
-        outputs = self.llm.generate(formatted_prompts, sampling_params)
 
-        end_generation_time = time.time()
-        logger.info(f"Generation for {len(prompts)} prompts took {end_generation_time - start_generation_time:.2f} seconds.")
+        # Manual timing as fallback
+        start_time = time.time()
+        outputs = self.llm.generate(formatted_prompts, sampling_params)
+        end_time = time.time()
+        manual_total_time = (end_time - start_time) * 1000  # Convert to milliseconds
+
+        latency_metrics = self.get_latency(outputs)
+        latency_metrics['manual_all_latency'] = manual_total_time
+        latency_metrics['manual_avg_total_latency'] = manual_total_time / len(prompts)
+        
+        logger.info(f"Avg total latency: {latency_metrics['avg_total_latency']:.2f} milliseconds")
+        logger.info(f"Avg prompt eval latency: {latency_metrics['avg_prompt_eval_latency']:.2f} milliseconds")
+        logger.info(f"Avg first token latency: {latency_metrics['avg_first_token_latency']:.2f} milliseconds")
+        logger.info(f"Avg sample latency: {latency_metrics['avg_sample_latency']:.2f} milliseconds")
+        logger.info(f"Avg tokens per millisecond: {latency_metrics['avg_tokens_per_millisecond']:.2f}")
+        logger.info(f"Manual all latency: {latency_metrics['manual_all_latency']:.2f} milliseconds")
+        logger.info(f"Manual avg total latency: {latency_metrics['manual_avg_total_latency']:.2f} milliseconds")
         
         # Process and display results
         results = [output.outputs[0].text.strip() for output in outputs]
         logger.info("\nProcessing complete.")
 
+        if return_latency:
+            return results, latency_metrics
         return results
 
 
@@ -174,7 +234,7 @@ def huggingface_test():
 
 def vllm_test():
     model_name = "meta-llama/Llama-3.1-8B-Instruct" 
-    model = VLLMModel(model_name, device="cuda:0", tensor_parallel_size=1, torch_dtype=torch.bfloat16)
+    model = VLLMModel(model_name, device="cuda", tensor_parallel_size=1, torch_dtype=torch.bfloat16)
     prompts = ["Solve the following problem:\n\nJen got 3 fish.  They each need $1 worth of food a day.  How much does she spend on food in the month of May?"]*3
     responses = model.batch_invoke(prompts)
     print(responses)
@@ -183,4 +243,5 @@ def vllm_test():
 # test function
 if __name__ == "__main__":
     # huggingface_test()
+    setup_logging(task_name="test", log_level=logging.INFO, log_dir="logs")
     vllm_test()
