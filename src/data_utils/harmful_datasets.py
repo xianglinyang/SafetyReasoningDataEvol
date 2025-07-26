@@ -147,6 +147,7 @@ def data_reader(dataset_name, split, save_dir=None):
         for item in data:
             prompt = item["prompt"]
             questions.append(prompt)
+    
     elif dataset_name == "renellm":
         assert split in ["train"], f"{dataset_name} does not have {split} splits."
         dataset = load_dataset("Deep1994/ReNeLLM-Jailbreak")
@@ -154,6 +155,7 @@ def data_reader(dataset_name, split, save_dir=None):
         for item in data:
             prompt = item['nested_prompt']
             questions.append(prompt)
+    
     elif dataset_name == "harmbench_attack":
         assert save_dir is not None, "save_dir is required for harmfulbench"
     
@@ -166,20 +168,22 @@ def data_reader(dataset_name, split, save_dir=None):
                 questions.append(value[0])
             else:
                 raise ValueError(f"Unknown data type: {type(value[0])}")
+    
     elif dataset_name == "xstest":
-        assert split in ["safe", "unsafe"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["test"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("walledai/XSTest")
         data = ds['test']
         
         for item in data:
             label = item['label']
-            if label == split:
+            if label == "unsafe":
                 prompt = item['prompt']
                 category = item['focus']
                 questions.append(prompt)
                 categories.append(category)
+
     elif dataset_name == "StrongREJECT":
-        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["train"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("walledai/StrongREJECT")
         data = ds['train']
         for item in data:
@@ -187,16 +191,18 @@ def data_reader(dataset_name, split, save_dir=None):
             category = item['category']
             questions.append(prompt)
             categories.append(category)
+
     elif dataset_name == "wildjailbreak":
-        assert split in ["benign", "harmful"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["eval"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("allenai/wildjailbreak", "eval")
         for item in ds:
-            if item['data_type'] == "adversarial_"+split:
+            if item['data_type'] == "adversarial_harmful":
                 prompt = item['adversarial']
                 questions.append(prompt)
-                categories.append(split)
+                categories.append("harmful")
+
     elif dataset_name == "Stereotype":
-        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["train"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("LibrAI/do-not-answer")
         data = ds['train']
         for item in data:
@@ -206,17 +212,19 @@ def data_reader(dataset_name, split, save_dir=None):
             if types_of_harm == "Social stereotypes and unfair discrimination":
                 questions.append(prompt)
                 categories.append(specific_harms)
+
     elif dataset_name == "CSRT":
-        assert split in ["english", "code_switch"], f"{dataset_name} does not have {split} splits."
-        ds = load_dataset("ToxicityPrompts/CSRT")
-        data = ds[split]
+        # assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("walledai/CSRT")
+        data = ds["train"]
         for item in data:
-            prompt = item['text']
+            prompt = item['prompt']
             harms = item['harms']
             questions.append(prompt)
-            categories.append(harms)
+            categories.append(harms[0])
+
     elif dataset_name == "XSafety":
-        assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["test"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("ToxicityPrompts/XSafety")
         data = ds['test']
         for item in data:
@@ -224,8 +232,9 @@ def data_reader(dataset_name, split, save_dir=None):
             category = item['category']
             questions.append(prompt)
             categories.append(category)
+
     elif dataset_name == "PolyGuardMix":
-        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["train"], f"{dataset_name} does not have {split} splits."
         category_mapping = {
             "S1": "Violent Crimes",
             "S2": "Non-Violent Crimes",

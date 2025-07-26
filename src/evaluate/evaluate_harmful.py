@@ -772,7 +772,7 @@ def main():
     del llm
     torch.cuda.empty_cache()
 
-    evaluation = evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching", "harmbench_cls"], eval_device=eval_device)
+    evaluation = evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching", "llamaguard3", "harmbench_cls"], eval_device=eval_device)
 
     results = {
         "model_name_or_path": model_name_or_path,
