@@ -159,7 +159,7 @@ async def main():
     parser.add_argument("--tensor_parallel_size", type=int, default=1)
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
     parser.add_argument("--run_id", type=str, default=None)
-    parser.add_argument("--llm_model_name", type=str, default="gpt-4.1-mini")
+    parser.add_argument("--llm_model_name", type=str, default="gpt-4.1-nano")
     args = parser.parse_args()
 
     setup_logging(task_name="evaluate_loss", run_id=args.run_id)

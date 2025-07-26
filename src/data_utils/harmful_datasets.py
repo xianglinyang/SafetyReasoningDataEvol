@@ -195,7 +195,8 @@ def data_reader(dataset_name, split, save_dir=None):
     elif dataset_name == "wildjailbreak":
         # assert split in ["eval"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("allenai/wildjailbreak", "eval")
-        for item in ds:
+        data = ds['train']
+        for item in data:
             if item['data_type'] == "adversarial_harmful":
                 prompt = item['adversarial']
                 questions.append(prompt)
@@ -235,27 +236,27 @@ def data_reader(dataset_name, split, save_dir=None):
 
     elif dataset_name == "PolyGuardMix":
         # assert split in ["train"], f"{dataset_name} does not have {split} splits."
-        category_mapping = {
-            "S1": "Violent Crimes",
-            "S2": "Non-Violent Crimes",
-            "S3": "Sex-Related Crimes",
-            "S4": "Child Sexual Exploitation",
-            "S5": "Defamation",
-            "S6": "Specialized Advice",
-            "S7": "Privacy",
-            "S8": "Intellectual Property",
-            "S9": "Indiscriminate Weapons",
-            "S10": "Hate",
-            "S11": "Suicide & Self-Harm",
-            "S12": "Sexual Content",
-            "S13": "Elections",
-            "S14": "Code Interpreter Abuse"
-        }
+        # category_mapping = {
+        #     "S1": "Violent Crimes",
+        #     "S2": "Non-Violent Crimes",
+        #     "S3": "Sex-Related Crimes",
+        #     "S4": "Child Sexual Exploitation",
+        #     "S5": "Defamation",
+        #     "S6": "Specialized Advice",
+        #     "S7": "Privacy",
+        #     "S8": "Intellectual Property",
+        #     "S9": "Indiscriminate Weapons",
+        #     "S10": "Hate",
+        #     "S11": "Suicide & Self-Harm",
+        #     "S12": "Sexual Content",
+        #     "S13": "Elections",
+        #     "S14": "Code Interpreter Abuse"
+        # }
         ds = load_dataset("ToxicityPrompts/PolyGuardMix")
         data = ds['train']
         for item in data:
             prompt = item['prompt']
-            category = category_mapping[item['prompt_safety_categories']] if item['prompt_safety_categories'] != "None" else "None"
+            category = item['prompt_safety_categories']
             label = item["prompt_harm_label"]
             if label == "yes":
                 questions.append(prompt)
