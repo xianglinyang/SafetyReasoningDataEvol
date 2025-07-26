@@ -6,7 +6,7 @@ from tqdm import tqdm
 import random
 import re
 
-from src.llm_zoo.api_base_models import OpenAILLM
+from src.llm_zoo.api_base_models import OpenAIModel
 logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """You are a expert in analyzing harmful questions. Your task is to analyze the harmful question and output the detailed analysis of the harmful question and response."""
 
@@ -292,7 +292,7 @@ def extract_yes_categories(scot_output_text: str) -> list[str]:
 # ----------Enrich Function----------
 def batch_get_summary(questions: list[str], model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
 	summary_prompts = [summary_prompt.format(question=question) for question in questions]
-	llm = OpenAILLM(model_name=model_name, 
+	llm = OpenAIModel(model_name=model_name, 
 				 	temperature=temperature, 
 				 	max_tokens=max_tokens)
 	summary_responses = list()
@@ -303,7 +303,7 @@ def batch_get_summary(questions: list[str], model_name: str = "gpt-4o-mini", max
 
 def batch_get_safe_cot(questions: list[str], model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
 	safe_cot_prompts = [safe_cot_prompt.format(question=question) for question in questions]
-	llm = OpenAILLM(model_name=model_name, 
+	llm = OpenAIModel(model_name=model_name, 
 				 	temperature=temperature, 
 				 	max_tokens=max_tokens)
 	safe_cot_responses = list()
@@ -324,7 +324,7 @@ class AnswerEvol:
 	def safe_cot(self, question: str, response: str, model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
 		# verify part
 		prompt = safe_cot_prompt.format(question=question)
-		llm = OpenAILLM(model_name=model_name, 
+		llm = OpenAIModel(model_name=model_name, 
 				 	temperature=temperature, 
 				 	max_tokens=max_tokens)
 		for _ in range(3):
@@ -346,7 +346,7 @@ class AnswerEvol:
 
 	def normal_cot(self, question: str, response: str, model_name: str = "gpt-4o-mini", max_tokens: int = 2048, temperature: float = 0.7) -> str:
 		prompt = summary_prompt.format(question=question)
-		llm = OpenAILLM(model_name=model_name, 
+		llm = OpenAIModel(model_name=model_name, 
 				 	temperature=temperature, 
 				 	max_tokens=max_tokens)
 		for _ in range(3):

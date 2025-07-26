@@ -22,9 +22,8 @@ from datasets import load_dataset
 
 from src.evol.question_evol import QuestionEvol
 from src.evol.answers import AnswerEvol
-from src.llm_zoo.utils import batch_invoke, load_model, load_tokenizer
-from src.llm_zoo.api_base_models import BaseLLM
-from src.llm_zoo.api_base_models import OpenAILLM
+from src.llm_zoo.api_base_models import BaseLLM, OpenAIModel
+from src.llm_zoo.code_base_models import VLLMModel
 from src.logger.config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -160,8 +159,8 @@ def process_circuitbreaker_val_dataset():
     raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_val.json')
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_val.json')
 
-    question_llm = OpenAILLM(model_name="gpt-4o-mini")
-    answer_llm = OpenAILLM(model_name="gpt-4.1-mini")
+    question_llm = OpenAIModel(model_name="gpt-4o-mini")
+    answer_llm = OpenAIModel(model_name="gpt-4.1-mini")
 
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
@@ -191,7 +190,7 @@ def process_dolly():
     logger.info(f"Processing dolly dataset...")
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
 
-    answer_llm = OpenAILLM(model_name="gpt-4.1-mini")
+    answer_llm = OpenAIModel(model_name="gpt-4.1-mini")
 
     with open(processed_file_path, 'r') as f:
         dataset = json.load(f)
@@ -223,7 +222,7 @@ def process_dolly():
     logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
 
 
-def process_instruction_following_dataset(model_name_or_path, dataset_path, device_map="cuda:0", batch_size=8, max_new_tokens=2048):
+def process_instruction_following_dataset(model_name_or_path, dataset_path, device_map="cuda", tensor_parallel_size=1, max_new_tokens=4096):
     """Process dataset and save with generated answers"""
     # Load llm
     logger.info(f"Loading model from {model_name_or_path}")
@@ -232,14 +231,20 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
     with open(dataset_path, 'r') as f:
         dataset = json.load(f)
     
-    # Extract questions
-    questions = [data['evolved_question'] for data in dataset]
+    # Extract questions and truncate if too long
+    questions = []
+    for data in dataset:
+        question = data['evolved_question']
+        # Truncate question if it's too long (leave some space for generation)
+        # Use character-based truncation as a rough estimate
+        if len(question) > 3000:  # Rough character limit
+            question = question[:3000] + "..."
+        questions.append(question)
     
     # Generate answers
     logger.info(f"Generating answers for {len(questions)} questions")
-    model = load_model(model_name_or_path, device_map=device_map)
-    tokenizer = load_tokenizer(model_name_or_path)
-    answers = batch_invoke(model, tokenizer, questions, batch_size=batch_size, max_new_tokens=max_new_tokens)
+    model = VLLMModel(model_name_or_path, device=device_map, tensor_parallel_size=tensor_parallel_size)
+    answers = model.batch_invoke(questions, max_new_tokens=max_new_tokens, return_latency=False)
 
     # Update dataset with generated answers
     for data, answer in zip(dataset, answers):
@@ -288,9 +293,13 @@ def main():
     # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
     # process_instruction_following_dataset(model_name_or_path="mistralai/Mistral-7B-Instruct-v0.2", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
 
-    logger.info("Processing Qwen dataset...")
-    process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
-    process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # logger.info("Processing Qwen dataset...")
+    # process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+    # process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
+
+    logger.info("Processing Llama-2-13b-chat-hf dataset...")
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-13b-chat-hf", dataset_path="data/processed/dolly_train.json", device_map="cuda", tensor_parallel_size=2, max_new_tokens=4096)
+    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-13b-chat-hf", dataset_path="data/processed/dolly_val.json", device_map="cuda", tensor_parallel_size=2, max_new_tokens=4096)
 
 
 if __name__ == "__main__":    

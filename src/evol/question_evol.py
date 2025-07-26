@@ -11,7 +11,7 @@ strategies:
 '''
 import logging
 
-from src.llm_zoo.api_base_models import OpenAILLM, BaseLLM
+from src.llm_zoo.api_base_models import OpenAIModel, BaseLLM
 from src.logger.config import setup_logging
 from src.evol import __strategies__
 from src.evol.question_evol_prompt import (
@@ -105,7 +105,7 @@ def main():
 	setup_logging(task_name="test")
 
 	question_evol = QuestionEvol()
-	llm_client = OpenAILLM(model_name="gpt-4o-mini")
+	llm_client = OpenAIModel(model_name="gpt-4o-mini")
 	variants = question_evol.generate_prompt_variants(question, llm_client)
 	
 	for k, v in variants.items():
