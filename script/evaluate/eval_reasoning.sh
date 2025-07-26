@@ -1,9 +1,9 @@
 #!/bin/bash
 
 per_gpu_jobs_num=1
-gpu_num=5  # number of GPUs
+gpu_num=1  # number of GPUs
 jobs_num=$((per_gpu_jobs_num*gpu_num))  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
-available_gpu_ids=(0 2 3 5 6)
+available_gpu_ids=(0)
 
 model_name_or_path_list=(
     "meta-llama/Llama-3.1-8B-Instruct"
@@ -32,20 +32,22 @@ model_name_or_path_list=(
 dataset_name_list=(
     # "mmlu"
     # "gsm8k"
-    "arc-c"
-    "arc-e"
-    "boolq"
-    "MMLU-STEM"
-    "sciq"
+    # "arc-c"
+    # "arc-e"
+    # "boolq"
+    # "MMLU-STEM"
+    # "sciq"
     # "SimpleQA"
-    "adv_glue"
+    # "adv_glue"
+    "aqua"
+    "strategyqa"
 )
 
 header="python -m src.evaluate.evaluate_common_reasoning"
 base_arguments="\
 --torch_type bf16 \
 --split test \
---eval_num 90000 \
+--eval_num 1000 \
 --device cuda"
 
 # Counter to distribute commands across GPUs

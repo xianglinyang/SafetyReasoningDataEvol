@@ -1,8 +1,8 @@
 #!/bin/bash
 per_gpu_jobs_num=1
-gpu_num=8
+gpu_num=7
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(0 1 2 3 4 5 6 7)
+gpu_ids=(1 2 3 4 5 6 7)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -10,23 +10,23 @@ gpu_ids=(0 1 2 3 4 5 6 7)
 gpu_setup="single"
 
 model_name_or_path_list=(
-    "meta-llama/Llama-3.1-8B-Instruct"
-    "mistralai/Mistral-7B-Instruct-v0.2"
+    # "meta-llama/Llama-3.1-8B-Instruct"
+    # "mistralai/Mistral-7B-Instruct-v0.2"
 
     "GraySwanAI/Llama-3-8B-Instruct-RR"
-    "GraySwanAI/Mistral-7B-Instruct-RR"
+    # "GraySwanAI/Mistral-7B-Instruct-RR"
 
-    "cais/zephyr_7b_r2d2"
+    # "cais/zephyr_7b_r2d2"
 
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873" # reasoning ablation
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
 
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-225"
 
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
@@ -44,8 +44,8 @@ dataset_name_list=(
     # "Stereotype"
     # "CSRT"
 
-    "wildjailbreak"
-    "XSafety"
+    # "wildjailbreak"
+    # "XSafety"
     "PolyGuardMix"
 
 )
@@ -154,7 +154,7 @@ prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 90000"
+--eval_num 1000"
 
 # Counter to distribute commands across GPUs
 counter=0
