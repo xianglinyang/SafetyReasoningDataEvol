@@ -52,12 +52,7 @@ def data_reader(dataset_name, split):
 
     if dataset_name == "gsm8k":
         gsm8k = load_dataset("gsm8k", "main")
-        if split == "train":
-            data = gsm8k['train']
-        elif split == "test":
-            data = gsm8k['test']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = gsm8k['test']
 
         for item in data:
             question = item['question']
@@ -67,14 +62,7 @@ def data_reader(dataset_name, split):
             answers.append(answer)
     elif dataset_name == "aqua":
         aqua = load_dataset("aqua_rat")
-        if split == "train":
-            data = aqua['train']
-        elif split == "test":
-            data = aqua['test']
-        elif split == "validation":
-            data = aqua['validation']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = aqua['test']
 
         for item in data:
             question = item['question']
@@ -91,14 +79,7 @@ def data_reader(dataset_name, split):
             answers.append(answer)
     elif dataset_name == "commonsenseqa":
         csqa = load_dataset("tau/commonsense_qa")
-        if split == "train":
-            data = csqa['train']
-        elif split == "test":
-            data = csqa['test']
-        elif split == "validation":
-            data = csqa['validation']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = csqa['test']
         
         for item in data:
             question = item['question']
@@ -117,12 +98,7 @@ def data_reader(dataset_name, split):
 
     elif dataset_name == "svamp":
         svamp = load_dataset("ChilleD/SVAMP")
-        if split == "train":
-            data = svamp['train']
-        elif split == "test":
-            data = svamp['test']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = svamp['test']
         
         for item in data:
             question = item["Body"]+item['Question']
@@ -136,12 +112,7 @@ def data_reader(dataset_name, split):
 
     elif dataset_name == "multiarith":
         multiarith = load_dataset("ChilleD/MultiArith")
-        if split == "train":
-            data = multiarith['train']
-        elif split == "test":
-            data = multiarith['test']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = multiarith['test']
         
         for item in data:
             question = item['question']
@@ -151,12 +122,7 @@ def data_reader(dataset_name, split):
 
     elif dataset_name == "date_understanding":
         date_understanding = load_dataset("hails/bigbench", "date_understanding_zero_shot")
-        if split == "train":
-            data = date_understanding['train']
-        elif split == "validation":
-            data = date_understanding['validation']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = date_understanding['validation']
         
         score_to_choices = lambda x: chr(ord('A')+x)
         all_options = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -182,12 +148,7 @@ def data_reader(dataset_name, split):
     
     elif dataset_name == "strategyqa":
         strategyqa = load_dataset("hails/bigbench", "strategyqa_zero_shot")
-        if split == "train":
-            data = strategyqa['train']
-        elif split == "validation":
-            data = strategyqa['validation']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = strategyqa['validation']
         
         score_to_target = lambda x: "No" if x.index(1) else 'Yes'
 
@@ -205,12 +166,7 @@ def data_reader(dataset_name, split):
 
     elif dataset_name == "shuffled_objects":
         tso = load_dataset("hails/bigbench", "tracking_shuffled_objects_zero_shot")
-        if split == "train":
-            data = tso['train']
-        elif split == "validation":
-            data = tso['validation']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = tso['validation']
         
         score_to_choices = lambda x: chr(ord('A')+x)
         all_options = ['A', 'B', 'C', 'D', 'E']
@@ -235,14 +191,7 @@ def data_reader(dataset_name, split):
     elif dataset_name == "mmlu":
         ds = load_dataset("cais/mmlu", "all")
         # load_dataset("cais/mmlu", "abstract_algebra")
-        if split == "test":
-            data = ds['test']
-        elif split == "validation":
-            data = ds['validation']
-        elif split == "dev":
-            data = ds['dev']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = ds['test']
         
         score_to_choices = lambda x: chr(ord('A')+x)
         all_options = ['A', 'B', 'C', 'D']
@@ -276,16 +225,9 @@ def data_reader(dataset_name, split):
           answers.append(a)
     
     elif dataset_name == "arc-c":
-        assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["test"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("allenai/ai2_arc", "ARC-Challenge")
-        if split == "train":
-            data = ds['train']
-        elif split == "validation":
-            data = ds['validation']
-        elif split == "test":
-            data = ds['test']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = ds['test']
         
         for item in data:
             question = item['question']
@@ -304,16 +246,9 @@ def data_reader(dataset_name, split):
             questions.append(question.strip() + " " + choice)
             answers.append(answer)
     elif dataset_name == "arc-e":
-        assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("allenai/ai2_arc", "ARC-Easy")
-        if split == "train":
-            data = ds['train']
-        elif split == "validation":
-            data = ds['validation']
-        elif split == "test":
-            data = ds['test']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = ds['test']
         
         for item in data:
             question = item['question']
@@ -332,23 +267,19 @@ def data_reader(dataset_name, split):
             questions.append(question.strip() + " " + choice)
             answers.append(answer)
     elif dataset_name == "boolq":
-        assert split in ["train","validation"], f"{dataset_name} does not have {split} splits."
+        # assert splict in ["train","validation"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("google/boolq")
-        if split == "train":
-            data = ds['train']
-        elif split == "validation":
-            data = ds['validation']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
-        
+        data = ds['validation']
         for item in data:
             passage = item['passage']
             question = item['question']
             answer = item['answer']
-            questions.append(passage + " " + question)
+            answer = "A" if answer else "B"
+            questions.append(passage + " " + question+" Answer Choices: (A) True (B) False")
             answers.append(answer)
+            
     elif dataset_name == "MMLU-STEM":
-        assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["test"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("TIGER-Lab/MMLU-STEM")
         data = ds['test']
         
@@ -370,16 +301,9 @@ def data_reader(dataset_name, split):
             questions.append(question.strip() + " " + choice)
             answers.append(answer)
     elif dataset_name == "sciq":
-        assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
+        # assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
         ds = load_dataset("allenai/sciq")
-        if split == "train":
-            data = ds['train']
-        elif split == "validation":
-            data = ds['validation']
-        elif split == "test":
-            data = ds['test']
-        else:
-            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        data = ds['test']
         
         for item in data:
             support = item['support']
@@ -414,9 +338,9 @@ def data_reader(dataset_name, split):
             questions.append(question)
             answers.append(answer)
     elif dataset_name == "adv_glue":
-        assert split in ["test"], f"{dataset_name} does not have {split} splits."
-        ds = load_dataset("basicv8vc/adv_glue", "adv_mnli")
-        data = ds['test']
+        # assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("AI-Secure/adv_glue", "adv_mnli")
+        data = ds['validation']
         for item in data:
             premise = item['premise']
             hypothesis = item['hypothesis']
