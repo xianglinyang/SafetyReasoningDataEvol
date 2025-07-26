@@ -178,6 +178,79 @@ def data_reader(dataset_name, split, save_dir=None):
                 category = item['focus']
                 questions.append(prompt)
                 categories.append(category)
+    elif dataset_name == "StrongREJECT":
+        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("walledai/StrongREJECT")
+        data = ds['train']
+        for item in data:
+            prompt = item['prompt']
+            category = item['category']
+            questions.append(prompt)
+            categories.append(category)
+    elif dataset_name == "wildjailbreak":
+        assert split in ["benign", "harmful"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("allenai/wildjailbreak", "eval")
+        for item in ds:
+            if item['data_type'] == "adversarial_"+split:
+                prompt = item['adversarial']
+                questions.append(prompt)
+                categories.append(split)
+    elif dataset_name == "Stereotype":
+        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("LibrAI/do-not-answer")
+        data = ds['train']
+        for item in data:
+            prompt = item['question']
+            types_of_harm = item['types_of_harm']
+            specific_harms = item['specific_harms']
+            if types_of_harm == "Social stereotypes and unfair discrimination":
+                questions.append(prompt)
+                categories.append(specific_harms)
+    elif dataset_name == "CSRT":
+        assert split in ["english", "code_switch"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("ToxicityPrompts/CSRT")
+        data = ds[split]
+        for item in data:
+            prompt = item['text']
+            harms = item['harms']
+            questions.append(prompt)
+            categories.append(harms)
+    elif dataset_name == "XSafety":
+        assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("ToxicityPrompts/XSafety")
+        data = ds['test']
+        for item in data:
+            prompt = item['text']
+            category = item['category']
+            questions.append(prompt)
+            categories.append(category)
+    elif dataset_name == "PolyGuardMix":
+        assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        category_mapping = {
+            "S1": "Violent Crimes",
+            "S2": "Non-Violent Crimes",
+            "S3": "Sex-Related Crimes",
+            "S4": "Child Sexual Exploitation",
+            "S5": "Defamation",
+            "S6": "Specialized Advice",
+            "S7": "Privacy",
+            "S8": "Intellectual Property",
+            "S9": "Indiscriminate Weapons",
+            "S10": "Hate",
+            "S11": "Suicide & Self-Harm",
+            "S12": "Sexual Content",
+            "S13": "Elections",
+            "S14": "Code Interpreter Abuse"
+        }
+        ds = load_dataset("ToxicityPrompts/PolyGuardMix")
+        data = ds['train']
+        for item in data:
+            prompt = item['prompt']
+            category = category_mapping[item['prompt_safety_categories']] if item['prompt_safety_categories'] != "None" else "None"
+            label = item["prompt_harm_label"]
+            if label == "yes":
+                questions.append(prompt)
+                categories.append(category)
     else:
         raise ValueError(f"{dataset_name} is not supported yet")
 
