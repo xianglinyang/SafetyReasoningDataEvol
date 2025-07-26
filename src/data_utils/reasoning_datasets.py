@@ -38,6 +38,7 @@ Online Test:
 # TODO: bbh, triviaqa, squad, humaneval
 
 import re
+import random
 import json
 from datasets import load_dataset
 from torch.utils.data import Dataset
@@ -262,17 +263,6 @@ def data_reader(dataset_name, split):
 
             questions.append(question.strip() + " " + choice)
             answers.append(answer)
-        
-        # # follow dolly format
-        # for item in data:
-        #     question = item['question']
-        #     choices = item['choices']
-        #     answer = item['answer']
-
-        #     question = question + " " + ",".join(choices)
-        #     questions.append(question)
-        #     answers.append(choices[answer])
-
     
     elif dataset_name in ("coin_flip", "last_letters"):
       dataset_path = f"../dataset/{dataset_name}/{dataset_name}.json"
@@ -284,6 +274,159 @@ def data_reader(dataset_name, split):
           a = line["answer"]
           questions.append(q)
           answers.append(a)
+    
+    elif dataset_name == "arc-c":
+        assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("allenai/ai2_arc", "ARC-Challenge")
+        if split == "train":
+            data = ds['train']
+        elif split == "validation":
+            data = ds['validation']
+        elif split == "test":
+            data = ds['test']
+        else:
+            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        
+        for item in data:
+            question = item['question']
+            choices = item['choices']
+            texts = choices['text']
+            labels = choices['label']
+            answer = item['answerKey']
+
+            choice = "Answer Choices:"
+            for label, text in zip(labels, texts):
+                choice += " ("
+                choice += label
+                choice += ") "
+                choice += text
+
+            questions.append(question.strip() + " " + choice)
+            answers.append(answer)
+    elif dataset_name == "arc-e":
+        assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("allenai/ai2_arc", "ARC-Easy")
+        if split == "train":
+            data = ds['train']
+        elif split == "validation":
+            data = ds['validation']
+        elif split == "test":
+            data = ds['test']
+        else:
+            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        
+        for item in data:
+            question = item['question']
+            choices = item['choices']
+            texts = choices['text']
+            labels = choices['label']
+            answer = item['answerKey']
+
+            choice = "Answer Choices:"
+            for label, text in zip(labels, texts):
+                choice += " ("
+                choice += label
+                choice += ") "
+                choice += text
+            
+            questions.append(question.strip() + " " + choice)
+            answers.append(answer)
+    elif dataset_name == "boolq":
+        assert split in ["train","validation"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("google/boolq")
+        if split == "train":
+            data = ds['train']
+        elif split == "validation":
+            data = ds['validation']
+        else:
+            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        
+        for item in data:
+            passage = item['passage']
+            question = item['question']
+            answer = item['answer']
+            questions.append(passage + " " + question)
+            answers.append(answer)
+    elif dataset_name == "MMLU-STEM":
+        assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("TIGER-Lab/MMLU-STEM")
+        data = ds['test']
+        
+        score_to_choices = lambda x: chr(ord('A')+x)
+        all_options = ['A', 'B', 'C', 'D']
+        
+        for item in data:
+            question = item['question']
+            choices = item['choices']
+            answer = item['answer']
+            answer = score_to_choices(int(answer))
+            choice = "Answer Choices:"
+            for label, text in zip(all_options, choices):
+                choice += " ("
+                choice += label
+                choice += ") "
+                choice += text
+            
+            questions.append(question.strip() + " " + choice)
+            answers.append(answer)
+    elif dataset_name == "sciq":
+        assert split in ["train","validation","test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("allenai/sciq")
+        if split == "train":
+            data = ds['train']
+        elif split == "validation":
+            data = ds['validation']
+        elif split == "test":
+            data = ds['test']
+        else:
+            raise TypeError(f"{dataset_name} does not have {split} splits.")
+        
+        for item in data:
+            support = item['support']
+            question = item['question']
+            answer = item['correct_answer']
+            distractor1 = item['distractor1']
+            distractor2 = item['distractor2']
+            distractor3 = item['distractor3']
+
+            score_to_choices = lambda x: chr(ord('A')+x)
+            all_options = ['A', 'B', 'C', 'D']
+            # shuffle and create a choice string
+            choices = [answer, distractor1, distractor2, distractor3]
+            random.shuffle(choices)
+            answer = score_to_choices(choices.index(answer))
+            choice = "Answer Choices:"
+            for label, text in zip(all_options, choices):
+                choice += " ("
+                choice += label
+                choice += ") "
+                choice += text
+            
+            questions.append(support + " " + question + " " + choice)
+            answers.append(answer)
+    elif dataset_name == "SimpleQA":
+        assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("basicv8vc/SimpleQA")
+        data = ds['test']
+        for item in data:
+            question = item['problem']
+            answer = item['answer']
+            questions.append(question)
+            answers.append(answer)
+    elif dataset_name == "adv_glue":
+        assert split in ["test"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("basicv8vc/adv_glue", "adv_mnli")
+        data = ds['test']
+        for item in data:
+            premise = item['premise']
+            hypothesis = item['hypothesis']
+            label = item['label']
+            score_to_choices = lambda x: chr(ord('A')+x)
+            question = f"""Given a {premise}, judge whether the following statement is (A) entailment, (B) Neutral, or (C) Contradiction: {hypothesis}. """
+            answer = score_to_choices(int(label))
+            questions.append(question)
+            answers.append(answer)
+
     else:
         raise ValueError("dataset is not properly defined ...")
     
@@ -329,7 +472,7 @@ def answer_cleansing_with_regex(dataset, llm_answer):
         pred = re.findall(r'A|B|C|D|E|F', pred)
     elif dataset in ("object_tracking"):
         pred = re.findall(r'A|B|C', pred)
-    elif dataset == "mmlu":
+    elif dataset == "mmlu" or dataset == "arc-c" or dataset == "arc-e" or dataset == "MMLU-STEM":
         pred = re.findall(r'A|B|C|D', pred)
     elif dataset in ("gsm8k", "multiarith", "svamp"):
         pred = pred.replace(",", "")
@@ -423,16 +566,20 @@ def zero_shot_answer_trigger(dataset):
     trigger = "The answer is"
     if dataset in ("aqua", "commonsenseqa"):
         trigger = "return only ONE CHARACTER (among A through E) as the answer"
-    elif dataset == "mmlu":
+    elif dataset in ("mmlu", "arc-c", "arc-e", "MMLU-STEM", "sciq"):
         trigger = "return only ONE CHARACTER (among A through D) as the answer"
     elif dataset in("gsm8k", "multiarith", "svamp"):
         trigger = "return arabic numerals of the answer"
+    elif dataset in ("boolq"):
+        trigger = "return the answer (true or false)"
     elif dataset in ("strategyqa", "coin_flip"):
         trigger = "return the answer (Yes or No)"
     elif dataset in ("bigbench_date"):
         trigger = "return only ONE CHARACTER (among A through F) as the answer"
     elif dataset in ("object_tracking"):
         trigger = "return only ONE CHARACTER (among A through C) as the answer" 
+    elif dataset in ("SimpleQA"):
+        trigger = "return the concise answer"
     return trigger
 
             
