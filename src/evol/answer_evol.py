@@ -224,6 +224,6 @@ if __name__ == "__main__":
     # gpt-4.1-mini is good enough.
 
     setup_logging(task_name="test")
-    test_invoke_batch()
+    test_invoke()
     asyncio.run(test_invoke_batch())
     
