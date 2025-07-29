@@ -15,8 +15,7 @@ Use openai for now.
 """
 import os
 import asyncio
-import functools
-from typing import List, Callable, Any
+from typing import List
 from openai import OpenAI, AsyncOpenAI
 from together import Together
 from google import genai
@@ -87,7 +86,7 @@ class OpenAIModel(BaseLLM):
                     print(f"All retries failed for prompt '{prompt_content[:50]}...': {e}")
                     return None
     
-    async def batch_invoke(self, prompts: List[str], system_prompt: str = None, batch_size: int = 1000, delay_between_batches: float = 1.0) -> List[str]:
+    async def batch_invoke(self, prompts: List[str], system_prompt: str = None, batch_size: int = 5000, delay_between_batches: float = 1.0) -> List[str]:
         """
         Processes a list of prompts in batches with rate limiting to avoid overwhelming the API.
         
