@@ -7,24 +7,32 @@
 - https://github.com/allenai/open-instruct/tree/main
 
 # Run Instructions
-Step 1: Download the dataset, evolve the questions, and get completions of dolly answers
+Step 1: Generate Demonstration for evolution (optional)
+1. Generate with ```src.evol.diverse_demo.ipynb```
+2. Copy paste the demo to ```src.evol.question_evol_prompt.py```
+
+Step 2: Implement a new demonstration strategy in ```question_evol``` and ```assemble``` (Optional)
+
+Step 3: Download the dataset, evolve the questions, and get completions of dolly answers
 ** No need to run this step as we have already downloaded the dataset and processed it **
 ```bash
 python -m src.evol.assemble
 ```
 
-Step 2: Train model
+Step 4: Filter non refusal answer
+
+Step 5: Train model
 ```bash
 bash script/train/lora_train.sh
 ```
 
-Step 3: Evaluate the model
+Step 6: Evaluate the model
 ```bash
 bash script/evaluate/prompt_attack.sh   # for prompt attack
 bash script/evaluate/evol_reasoning.sh  # for reasoning
 ```
 
-(Optional) Step 4: Evaluate the model on HarmBench
+(Optional) Step 7: Evaluate the model on HarmBench
 - Download HarmBench repo
 ```bash
 git clone https://github.com/centerforaisafety/HarmBench.git
@@ -51,3 +59,5 @@ huggingface-cli login
 ```bash
 export OPENAI_API_KEY="xxx"
 ```
+
+
