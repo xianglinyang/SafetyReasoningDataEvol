@@ -91,7 +91,7 @@ async def evaluate_reasoning(llm, dataset_name, dataset, eval_num=-1, clean_mode
     else:
         eval_idxs = random.sample(range(len(dataset)), eval_num)
 
-    questions = [dataset[idx][0] for idx in eval_idxs]
+    questions = [dataset[idx][0][:3000] for idx in eval_idxs]
     gt_answers = [dataset[idx][2] for idx in eval_idxs]
 
     corrects, latency_metrics = await process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name)
