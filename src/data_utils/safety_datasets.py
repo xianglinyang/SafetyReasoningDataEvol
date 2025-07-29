@@ -16,7 +16,8 @@ class SafetyReasoningDataset(Dataset):
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
                 include_variants=True,
-                include_reasoning=True
+                include_reasoning=True,
+                demo_selected_strategy="diverse"
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.model_name = model_name
@@ -24,15 +25,24 @@ class SafetyReasoningDataset(Dataset):
         self.max_length = max_length
         self.include_variants = include_variants
         self.include_reasoning = include_reasoning
+        self.demo_selected_strategy = demo_selected_strategy
         self._load_data(dataset_name, split)
 
     def _load_data(self, dataset_name, split):
         # ======================= Circuitbreaker ======================= #
         # circuitbreaker original data+ processed data
-        data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
+        if split == "train":
+            if self.demo_selected_strategy == "diverse":
+                data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
+            else:
+                data_path = f"data/processed/{dataset_name}_{split}_{self.demo_selected_strategy}.json"
+        else:
+            data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
+        
         with open(data_path, 'r') as f:
             circuitbreaker = json.load(f)
         # for faster computation
+        circuitbreaker = circuitbreaker[:len(circuitbreaker)//2]
         if split == 'val':
             circuitbreaker = circuitbreaker[:100]
     
@@ -173,7 +183,8 @@ if __name__ == "__main__":
         tokenizer=tokenizer,
         max_length=2048,
         include_variants=True,
-        include_reasoning=True
+        include_reasoning=True,
+        demo_selected_strategy="diverse"
     )
     print(train_dataset.refusal_dataset[0])
     print(train_dataset.retain_dataset[0])

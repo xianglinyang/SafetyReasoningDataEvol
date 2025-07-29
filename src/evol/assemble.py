@@ -10,19 +10,20 @@ The steps are:
 """
 # TODO: assemble the question and answer into a jsonl file -> save in the data/evolved_data folder
 
+import asyncio
 import os
 import json
 import requests
 import random
 import logging
-import torch
 from tqdm import tqdm
-import argparse
 from datasets import load_dataset
+import argparse
 
 from src.evol.question_evol import QuestionEvol
-from src.evol.answers import AnswerEvol
-from src.llm_zoo.api_base_models import BaseLLM, OpenAIModel
+from src.evol.answer_evol import AnswerEvol
+from src.llm_zoo.base_model import BaseLLM
+from src.llm_zoo.api_base_models import OpenAIModel
 from src.llm_zoo.code_base_models import VLLMModel
 from src.logger.config import setup_logging
 
@@ -41,18 +42,31 @@ class DataEvolver:
         self.question_evol = QuestionEvol()
         self.answer_evol = AnswerEvol()
     
-    def evol_question(self, question_llm: BaseLLM, question):
-        question_variants = self.question_evol.generate_prompt_variants(question, question_llm)
+    def evol_question(self, question_llm: BaseLLM, question, demo_selected_strategy="diverse"):
+        question_variants = self.question_evol.generate_prompt_variants(question, question_llm, demo_selected_strategy)
+        return question_variants
+    
+    async def evol_question_batch(self, question_llm: BaseLLM, questions: list[str], demo_selected_strategy="diverse"):
+        question_variants = await self.question_evol.generate_prompt_variants_batch(questions, question_llm, demo_selected_strategy)
         return question_variants
     
     def evol_answer(self, answer_llm: BaseLLM, question, question_type, answer_output):
         answer_block, metadata = self.answer_evol.generate_evol_answer(answer_llm, question, question_type, answer_output, return_metadata=True)
         return answer_block, metadata
     
-    def evol_data(self, question_llm: BaseLLM, answer_llm: BaseLLM, question, answer_output, question_type):
-        question_variants = self.question_evol.generate_prompt_variants(question, question_llm)
+    async def evol_answer_batch(self, answer_llm: BaseLLM, questions: list[str], question_type: str, answers: list[str], return_metadata=True):
+        answer_blocks, metadata = await self.answer_evol.generate_evol_answer_batch(answer_llm, questions, question_type, answers, return_metadata)
+        return answer_blocks, metadata
+    
+    def evol_data(self, question_llm: BaseLLM, answer_llm: BaseLLM, question, answer_output, question_type, demo_selected_strategy="diverse"):
+        question_variants = self.question_evol.generate_prompt_variants(question, question_llm, demo_selected_strategy)
         answer_block, metadata = self.answer_evol.generate_evol_answer(answer_llm, question, question_type, answer_output, return_metadata=True)
         return question_variants, answer_block, metadata
+    
+    async def evol_data_batch(self, question_llm: BaseLLM, answer_llm: BaseLLM, questions: list[str], answers: list[str], question_type: str):
+        question_variants = await self.question_evol.generate_prompt_variants_batch(questions, question_llm, demo_selected_strategy="random")
+        answer_blocks, metadata = await self.answer_evol.generate_evol_answer_batch(answer_llm, questions, question_type, answers, return_metadata=True)
+        return question_variants, answer_blocks, metadata
 
 #-------------------------Data Loading and Saving-------------------------
 # Adapt from https://raw.githubusercontent.com/GraySwanAI/circuit-breakers/refs/heads/main/data/circuit_breakers_val.json
@@ -122,71 +136,67 @@ def download_dolly():
 
 
 #-------------------------Data Processing-------------------------
-def process_circuitbreaker_train_dataset():
+async def process_circuitbreaker_train_dataset(demo_selected_strategy="diverse"):
     logger.info(f"Processing circuitbreaker train dataset...")
     raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_train.json')
-    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_train.json')
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_train_{demo_selected_strategy}.json')
 
-    question_llm = OpenAILLM(model_name="gpt-4o-mini")
-    answer_llm = OpenAILLM(model_name="gpt-4.1-mini")
-
-    # dataset keys: category, prompt, llama3_output
-    with open(raw_file_path, 'r') as f:
-        dataset = json.load(f)
-
-    data_evolver = DataEvolver()
-    new_dataset = []
-    count = 0
-
-    for data in tqdm(dataset, desc="Evolving dataset"):
-        question = data['prompt']
-        question_variants, answer_instance, metadata = data_evolver.evol_data(question_llm, answer_llm, question, answer=None, question_type="harmful")
-
-        data['evolved_variants'] = question_variants
-        data['evolved_answer'] = answer_instance
-        data['metadata'] = metadata
-        count += 1
-        new_dataset.append(data)
-        logger.info(f"Evolved {count} Question Variants: {question_variants}")
-        logger.info(f"Evolved {count} Answer: {answer_instance}")
-    
-    dump_json(new_dataset, processed_file_path)
-    logger.info(f"Evolved train dataset saved to {processed_file_path}")
-
-
-def process_circuitbreaker_val_dataset():
-    logger.info(f"Processing circuitbreaker val dataset...")
-    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_val.json')
-    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_val.json')
-
-    question_llm = OpenAIModel(model_name="gpt-4o-mini")
+    question_llm = OpenAIModel(model_name="gpt-4.1-mini")
     answer_llm = OpenAIModel(model_name="gpt-4.1-mini")
 
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
-        dataset = json.load(f)
+        dataset = json.load(f)[:10]
 
     data_evolver = DataEvolver()
     new_dataset = []
     count = 0
-    for data in tqdm(dataset, desc="Evolving dataset"):
-        question = data['prompt']
-        output = data['llama3_output']
-        question_variants, answer_instance, metadata = data_evolver.evol_data(question_llm, answer_llm, question, answer=output, question_type="benign")
 
-        data['evolved_variants'] = question_variants
-        data['evolved_answer'] = answer_instance
+    questions = [data['prompt'] for data in dataset]
+    question_variants = await data_evolver.evol_question_batch(question_llm, questions, demo_selected_strategy)
+    answers, metadatas = await data_evolver.evol_answer_batch(answer_llm, questions, "harmful", [None]*len(questions), return_metadata=True)
+
+    for data, question_variant, answer, metadata in tqdm(zip(dataset, question_variants, answers, metadatas), desc="Evolving dataset"):
+        data['evolved_variants'] = question_variant['evolved_variants']
+        data['evolved_answer'] = answer
         data['metadata'] = metadata
         count += 1
-        logger.info(f"Evolved {count} Question Variants: {question_variants}")
-        logger.info(f"Evolved {count} Answer: {answer_instance}")
         new_dataset.append(data)
     
     dump_json(new_dataset, processed_file_path)
     logger.info(f"Evolved train dataset saved to {processed_file_path}")
 
 
-def process_dolly():
+async def process_circuitbreaker_val_dataset():
+    logger.info(f"Processing circuitbreaker val dataset...")
+    raw_file_path = os.path.join(RAW_DATA_DIR, f'circuitbreaker_val.json')
+    processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'circuitbreaker_val.json')
+
+    answer_llm = OpenAIModel(model_name="gpt-4.1-mini")
+
+    # dataset keys: category, prompt, llama3_output
+    with open(raw_file_path, 'r') as f:
+        dataset = json.load(f)[:10]
+
+    data_evolver = DataEvolver()
+    new_dataset = []
+    count = 0
+
+    questions = [data['prompt'] for data in dataset]
+    outputs = [data['llama3_output'] for data in dataset]
+    answers, metadatas = await data_evolver.evol_answer_batch(answer_llm, questions, "benign", outputs, return_metadata=True)
+
+    for data, answer, metadata in tqdm(zip(dataset, answers, metadatas), desc="Evolving dataset"):
+        data['evolved_answer'] = answer
+        data['metadata'] = metadata
+        count += 1
+        new_dataset.append(data)
+    
+    dump_json(new_dataset, processed_file_path)
+    logger.info(f"Evolved train dataset saved to {processed_file_path}")
+
+
+async def process_dolly():
     logger.info(f"Processing dolly dataset...")
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'dolly.json')
 
@@ -198,19 +208,19 @@ def process_dolly():
     data_evolver = DataEvolver()
     new_dataset = []
     count = 0
-    
-    for data in tqdm(dataset, desc="Evolving Dolly dataset"):
-        count += 1
-        question = data['evolved_question']
-        output = data['answer']
 
-        answer_instance, metadata = data_evolver.evol_answer(answer_llm, question, "benign", output, return_metadata=True)
-        data['evolved_answer'] = answer_instance
+    questions = [data['evolved_question'] for data in dataset]
+    outputs = [data['answer'] for data in dataset]
+    answers, metadatas = await data_evolver.evol_answer_batch(answer_llm, questions, "benign", outputs, return_metadata=True)
+
+    for data, answer, metadata in tqdm(zip(dataset, answers, metadatas), desc="Evolving dataset"):
+        data['evolved_answer'] = answer
         data['metadata'] = metadata
+        count += 1
         new_dataset.append(data)
-        
-        logger.info(f"{count} Question: {question}")
-        logger.info(f"Evolved {count} Answer: {answer_instance}")
+    
+    dump_json(new_dataset, processed_file_path)
+    logger.info(f"Evolved dolly dataset saved to {processed_file_path}")
     
     # randomly split it into train and val with ratio=8:2
     random.shuffle(new_dataset)
@@ -263,22 +273,22 @@ def process_instruction_following_dataset(model_name_or_path, dataset_path, devi
 # flan v2 dataset
 
 #-------------------------Main-------------------------
-def main():
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--run_id", '-r', type=int)
-    # args = parser.parse_args()
-    # run_id = args.run_id
+async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run_id", '-r', type=int)
+    args = parser.parse_args()
+    run_id = args.run_id
 
-    # setup_logging(task_name="data_evol", run_id=run_id)
-    # logger.info("Assembling data...")
+    setup_logging(task_name="data_evol", run_id=run_id)
+    logger.info("Assembling data...")
 
-    # logger.info("Downloading circuitbreaker dataset...")
-    # download_circuitbreaker_dataset(train=True)
-    # download_circuitbreaker_dataset(train=False)
+    logger.info("Downloading circuitbreaker dataset...")
+    download_circuitbreaker_dataset(train=True)
+    download_circuitbreaker_dataset(train=False)
 
-    # logger.info("Processing circuitbreaker dataset...")
-    # process_circuitbreaker_train_dataset() 
-    # process_circuitbreaker_val_dataset() 
+    logger.info("Processing circuitbreaker dataset...")
+    await process_circuitbreaker_train_dataset(demo_selected_strategy="random") 
+    await process_circuitbreaker_val_dataset() 
 
     # logger.info("Processing dolly dataset...")
     # download_dolly()
@@ -297,10 +307,10 @@ def main():
     # process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_train.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
     # process_instruction_following_dataset(model_name_or_path="Qwen/Qwen2.5-7B-Instruct", dataset_path="data/processed/dolly_val.json", device_map="cuda:0", batch_size=4, max_new_tokens=2048)
 
-    logger.info("Processing Llama-2-13b-chat-hf dataset...")
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-13b-chat-hf", dataset_path="data/processed/dolly_train.json", device_map="cuda", tensor_parallel_size=2, max_new_tokens=4096)
-    process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-13b-chat-hf", dataset_path="data/processed/dolly_val.json", device_map="cuda", tensor_parallel_size=2, max_new_tokens=4096)
+    # logger.info("Processing Llama-2-13b-chat-hf dataset...")
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-13b-chat-hf", dataset_path="data/processed/dolly_train.json", device_map="cuda", tensor_parallel_size=2, max_new_tokens=4096)
+    # process_instruction_following_dataset(model_name_or_path="meta-llama/Llama-2-13b-chat-hf", dataset_path="data/processed/dolly_val.json", device_map="cuda", tensor_parallel_size=2, max_new_tokens=4096)
 
 
 if __name__ == "__main__":    
-    main()
+    asyncio.run(main())
