@@ -111,7 +111,7 @@ def format_scot_output_variable_two_stage(
     reasoning_part = " ".join(filter(None, output_parts))
 
     # Final Response
-    response_block = f"#### Response\n{answer.strip()}"
+    response_block = f"#### Response\n{answer}"
 
     return reasoning_part + "\n" + response_block
 
@@ -174,10 +174,10 @@ class AnswerEvol:
             return answer_block
     
     async def generate_evol_answer_batch(self,llm_client: BaseLLM, questions: list[str], question_type: str, answers=None, return_metadata=True):
-        metadata = await self._get_metadata_batch(llm_client, questions, question_type)
-        answer_blocks = [metadata_to_answer(metadata, answers[i]) for i, metadata in enumerate(metadata)]
+        metadatas = await self._get_metadata_batch(llm_client, questions, question_type)
+        answer_blocks = [metadata_to_answer(metadata, answers[i]) for i, metadata in enumerate(metadatas)]
         if return_metadata:
-            return answer_blocks, metadata
+            return answer_blocks, metadatas
         else:
             return answer_blocks
         

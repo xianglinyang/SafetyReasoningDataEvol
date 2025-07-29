@@ -154,17 +154,22 @@ async def process_circuitbreaker_train_dataset(demo_selected_strategy="diverse")
 
     questions = [data['prompt'] for data in dataset]
     question_variants = await data_evolver.evol_question_batch(question_llm, questions, demo_selected_strategy)
-    answers, metadatas = await data_evolver.evol_answer_batch(answer_llm, questions, "harmful", [None]*len(questions), return_metadata=True)
 
-    for data, question_variant, answer, metadata in tqdm(zip(dataset, question_variants, answers, metadatas), desc="Evolving dataset"):
+    for data, question_variant in tqdm(zip(dataset, question_variants), desc="Evolving dataset"):
         data['evolved_variants'] = question_variant['evolved_variants']
+        count += 1
+        new_dataset.append(data)
+    dump_json(new_dataset, processed_file_path)
+    logger.info(f"Evolved train dataset with question variants saved to {processed_file_path}")
+
+    answers, metadatas = await data_evolver.evol_answer_batch(answer_llm, questions, "harmful", [None]*len(questions), return_metadata=True)
+    for data, answer, metadata in tqdm(zip(new_dataset, answers, metadatas), desc="Evolving dataset"):
         data['evolved_answer'] = answer
         data['metadata'] = metadata
         count += 1
-        new_dataset.append(data)
-    
     dump_json(new_dataset, processed_file_path)
-    logger.info(f"Evolved train dataset saved to {processed_file_path}")
+    logger.info(f"Evolved train dataset with answer and metadata saved to {processed_file_path}")
+    
 
 
 async def process_circuitbreaker_val_dataset():
@@ -282,13 +287,13 @@ async def main():
     setup_logging(task_name="data_evol", run_id=run_id)
     logger.info("Assembling data...")
 
-    logger.info("Downloading circuitbreaker dataset...")
-    download_circuitbreaker_dataset(train=True)
-    download_circuitbreaker_dataset(train=False)
+    # logger.info("Downloading circuitbreaker dataset...")
+    # download_circuitbreaker_dataset(train=True)
+    # download_circuitbreaker_dataset(train=False)
 
     logger.info("Processing circuitbreaker dataset...")
     await process_circuitbreaker_train_dataset(demo_selected_strategy="random") 
-    await process_circuitbreaker_val_dataset() 
+    # await process_circuitbreaker_val_dataset() 
 
     # logger.info("Processing dolly dataset...")
     # download_dolly()
