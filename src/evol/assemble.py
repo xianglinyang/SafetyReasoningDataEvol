@@ -146,7 +146,7 @@ async def process_circuitbreaker_train_dataset(demo_selected_strategy="diverse")
 
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
-        dataset = json.load(f)[:10]
+        dataset = json.load(f)
 
     data_evolver = DataEvolver()
     new_dataset = []
@@ -176,7 +176,7 @@ async def process_circuitbreaker_val_dataset():
 
     # dataset keys: category, prompt, llama3_output
     with open(raw_file_path, 'r') as f:
-        dataset = json.load(f)[:10]
+        dataset = json.load(f)
 
     data_evolver = DataEvolver()
     new_dataset = []
