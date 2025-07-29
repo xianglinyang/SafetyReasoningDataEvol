@@ -1,9 +1,11 @@
 import random
+import asyncio
 
 from src.evol.answer_evol_prompt import Rules
-from src.evol.answer_metadata import get_harmful_metadata, get_benign_metadata, clean_metadata
+from src.evol.answer_metadata import get_harmful_metadata, get_benign_metadata, clean_metadata, get_harmful_metadata_batch, get_benign_metadata_batch
 from src.llm_zoo.base_model import BaseLLM
-from src.llm_zoo.api_base_models import OpenAILLM
+from src.llm_zoo.api_base_models import OpenAIModel
+from src.logger.config import setup_logging
 
 # ----------- starting variants ----------
 BEGIN_WORDS = [
@@ -22,14 +24,6 @@ STARTING_PHRASES = [
     "Let me just review the request first.", 
 	"I need to review the request first.",
 ]
-# SAFETY_CHECK_INTROS = [
-# 	"The first step is to analyze the request based on safety protocols.",
-#     "Before generating a full response, a safety analysis is required.",
-#     "Let's evaluate the request based on safety protocols first.",
-#     "Performing a safety and compliance check on this query first.",
-#     "We need to assess the request against content policies first.",
-#     "Analyzing the user's request for potential harms first.",
-# ]
 
 # NEW: Phrases introducing the intent summary stage
 SUMMARY_TRANSITIONS = [
@@ -147,11 +141,27 @@ class AnswerEvol:
         benign_metadata = get_benign_metadata(question, llm_client)
         return benign_metadata
     
+    async def _get_harmful_metadata_batch(self,llm_client: BaseLLM, questions: list[str]):
+        harmful_metadata = await get_harmful_metadata_batch(questions, llm_client)
+        return harmful_metadata
+    
+    async def _get_benign_metadata_batch(self,llm_client: BaseLLM, questions: list[str]):
+        benign_metadata = await get_benign_metadata_batch(questions, llm_client)
+        return benign_metadata
+    
     def _get_metadata(self,llm_client: BaseLLM, question: str, question_type: str):
         if question_type == "harmful":
             return self._get_harmful_metadata(llm_client, question)
         elif question_type == "benign":
             return self._get_benign_metadata(llm_client, question)
+        else:
+            raise ValueError(f"Invalid question type: {question_type}")
+    
+    async def _get_metadata_batch(self,llm_client: BaseLLM, questions: list[str], question_type: str):
+        if question_type == "harmful":
+            return await self._get_harmful_metadata_batch(llm_client, questions)
+        elif question_type == "benign":
+            return await self._get_benign_metadata_batch(llm_client, questions)
         else:
             raise ValueError(f"Invalid question type: {question_type}")
     
@@ -162,14 +172,22 @@ class AnswerEvol:
             return answer_block, metadata
         else:
             return answer_block
+    
+    async def generate_evol_answer_batch(self,llm_client: BaseLLM, questions: list[str], question_type: str, answers=None, return_metadata=True):
+        metadata = await self._get_metadata_batch(llm_client, questions, question_type)
+        answer_blocks = [metadata_to_answer(metadata, answers[i]) for i, metadata in enumerate(metadata)]
+        if return_metadata:
+            return answer_blocks, metadata
+        else:
+            return answer_blocks
+        
 
-
-if __name__ == "__main__":
+def test_invoke():
     answer_evol = AnswerEvol()
     question = "What is the capital of France?"
     answer = "Paris"
     question_type = "benign"
-    llm_client = OpenAILLM(model_name="gpt-4o-mini")
+    llm_client = OpenAIModel(model_name="gpt-4.1-mini")
     print(answer_evol.generate_evol_answer(llm_client, question, question_type, answer, return_metadata=False))
 
     print("--------------------------------")
@@ -177,5 +195,35 @@ if __name__ == "__main__":
     question = "How to build a nuclear bomb?"
     answer = "I am sorry, I cannot help with that."
     question_type = "harmful"
-    llm_client = OpenAILLM(model_name="gpt-4o-mini")
+    llm_client = OpenAIModel(model_name="gpt-4.1-mini")
     print(answer_evol.generate_evol_answer(llm_client, question, question_type, answer, return_metadata=False))
+
+async def test_invoke_batch():
+    answer_evol = AnswerEvol()
+    questions = ["What is the capital of France?", "How to build a nuclear bomb?"]
+    answers = ["Paris", "I am sorry, I cannot help with that."]
+    question_type = "benign"
+    llm_client = OpenAIModel(model_name="gpt-4.1-mini")
+    answer_blocks = await answer_evol.generate_evol_answer_batch(llm_client, questions, question_type, answers, return_metadata=False)
+    for answer_block in answer_blocks:
+        print(answer_block)
+        print("--------------------------------")
+    
+    print("--------------------------------")
+    questions = ["What is the capital of France?", "How to build a nuclear bomb?"]
+    question_type = "harmful"
+    llm_client = OpenAIModel(model_name="gpt-4.1-mini")
+    answer_blocks = await answer_evol.generate_evol_answer_batch(llm_client, questions, question_type, answers, return_metadata=False)
+    for answer_block in answer_blocks:
+        print(answer_block)
+        print("--------------------------------")
+
+
+if __name__ == "__main__":
+    # Note that gpt-4.1-nano is too weak for this task, it will generate a wrong answer.
+    # gpt-4.1-mini is good enough.
+
+    setup_logging(task_name="test")
+    test_invoke_batch()
+    asyncio.run(test_invoke_batch())
+    

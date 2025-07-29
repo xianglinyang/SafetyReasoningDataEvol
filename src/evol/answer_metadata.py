@@ -6,24 +6,36 @@ from tqdm import tqdm
 
 import argparse
 
-from src.llm_zoo.api_base_models import OpenAILLM
+from src.llm_zoo.api_base_models import OpenAIModel
 from src.utils.common_utils import str2json, load_json_data, save_json_data
 from src.logger.config import setup_logging
 from src.evol.answer_evol_prompt import HARMFUL_QUESTION_USER_PROMPT, BENIGN_QUESTION_USER_PROMPT
 
 logger = logging.getLogger(__name__)
 
-def get_harmful_metadata(instruction: str, llm_client: OpenAILLM) -> str:
+def get_harmful_metadata(instruction: str, llm_client: OpenAIModel) -> str:
     prompt = HARMFUL_QUESTION_USER_PROMPT + instruction
     summary = llm_client.invoke(prompt)
     summary = str2json(summary)
     return summary
 
-def get_benign_metadata(instruction: str, llm_client: OpenAILLM) -> str:
+async def get_harmful_metadata_batch(instructions: list[str], llm_client: OpenAIModel) -> list[str]:
+    prompts = [HARMFUL_QUESTION_USER_PROMPT + instruction for instruction in instructions]
+    summaries = await llm_client.batch_invoke(prompts)
+    summaries = [str2json(summary) for summary in summaries]
+    return summaries
+
+def get_benign_metadata(instruction: str, llm_client: OpenAIModel) -> str:
     prompt = BENIGN_QUESTION_USER_PROMPT + instruction
     summary = llm_client.invoke(prompt)
     summary = str2json(summary)
     return summary
+
+async def get_benign_metadata_batch(instructions: list[str], llm_client: OpenAIModel) -> list[str]:
+    prompts = [BENIGN_QUESTION_USER_PROMPT + instruction for instruction in instructions]
+    summaries = await llm_client.batch_invoke(prompts)
+    summaries = [str2json(summary) for summary in summaries]
+    return summaries
 
 def reformat_categories(categories):
     reformatted_categories = {}
@@ -55,9 +67,7 @@ def main():
 
     setup_logging(task_name="answer_metadata", run_id=args.run_id)
 
-    llm_client = OpenAILLM(model_name=args.model_name, 
-            temperature=args.temperature, 
-            max_tokens=args.max_tokens)
+    llm_client = OpenAIModel(model_name=args.model_name)
     
     data = load_json_data(args.data_path)
     

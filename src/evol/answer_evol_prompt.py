@@ -43,10 +43,9 @@ HARMFUL_QUESTION_USER_PROMPT = """As a expert in analyzing harmful questions, yo
 [
 {
 "Categories": [{"category1": "reason1"}, {"category2": "reason2"}],
-"Intent": "The core intent of the question is to [describe the intent in one phrase less than 10 words and use verb to describe the intent].",
+"Intent": "The core intent of the question is to ...",
 "Refusal": "The refusal response to the question."
-},
-...
+}
 ]
 ```
 
@@ -62,13 +61,12 @@ BENIGN_QUESTION_USER_PROMPT = """As a expert in analyzing questions, your tasks 
 • Do not summarize, modify, or simplify any part of the original question.
 • If the intent or categories are unclear, leave the value as None.
 
-#### Provide the output in the following JSON format:
+#### Provide the output in the following JSON format without any other text:
 ```json
 [
 {
-"Intent": "The core intent of the question is to [describe the intent in one phrase less than 10 words and use verb to describe the intent].",
-},
-...
+"Intent": "The core intent of the question is to ..."
+}
 ]
 ```
 
