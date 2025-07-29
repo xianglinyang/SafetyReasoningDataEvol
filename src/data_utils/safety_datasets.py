@@ -42,7 +42,7 @@ class SafetyReasoningDataset(Dataset):
         with open(data_path, 'r') as f:
             circuitbreaker = json.load(f)
         # for faster computation
-        circuitbreaker = circuitbreaker[:len(circuitbreaker)//2]
+        # circuitbreaker = circuitbreaker[:len(circuitbreaker)//2]
         if split == 'val':
             circuitbreaker = circuitbreaker[:100]
     

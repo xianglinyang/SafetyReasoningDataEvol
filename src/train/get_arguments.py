@@ -32,6 +32,12 @@ class DataArguments:
             "help": "Whether to include reasoning in the dataset"
         }
     )
+    demo_selected_strategy: Optional[str] = field(
+        default="diverse",
+        metadata={
+            "help": "The strategy to select the demo examples"
+        }
+    )
 
 @dataclass
 class ModelArguments:
