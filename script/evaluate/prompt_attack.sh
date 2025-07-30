@@ -1,8 +1,8 @@
 #!/bin/bash
 per_gpu_jobs_num=1
-gpu_num=7
+gpu_num=8
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(1 2 3 4 5 6 7)
+gpu_ids=(0 1 2 3 4 5 6 7)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -13,7 +13,7 @@ model_name_or_path_list=(
     # "meta-llama/Llama-3.1-8B-Instruct"
     # "mistralai/Mistral-7B-Instruct-v0.2"
 
-    "GraySwanAI/Llama-3-8B-Instruct-RR"
+    # "GraySwanAI/Llama-3-8B-Instruct-RR"
     # "GraySwanAI/Mistral-7B-Instruct-RR"
 
     # "cais/zephyr_7b_r2d2"
@@ -30,10 +30,15 @@ model_name_or_path_list=(
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
+    # "meta-llama/Llama-2-13b-chat-hf"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/outputs/circuitbreaker/llama2-13b_20250727-095351/checkpoint-194"
+
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
+    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
 
 )
 dataset_name_list=(
-    # "sorrybench"
+    "sorrybench"
     # "advbench"
     # "harmbench"
     # "harmbench_attack"
@@ -46,7 +51,7 @@ dataset_name_list=(
 
     # "wildjailbreak"
     # "XSafety"
-    "PolyGuardMix"
+    # "PolyGuardMix"
 
 )
 attack_name_list=(
@@ -64,29 +69,29 @@ attack_name_list=(
 )
 
 splits=(
-    "train"
-#     "logical_appeal"
-#     "uncommon_dialects"
-#     "role_play"
-#     "expert_endorsement"
-#     "slang"
-#     "evidence-based_persuasion"
+    # "train"
+    "logical_appeal"
+    "uncommon_dialects"
+    "role_play"
+    "expert_endorsement"
+    "slang"
+    "evidence-based_persuasion"
 
-#     "ascii"
-#     "atbash"
-#     "caesar"
-#     "morse"
+    "ascii"
+    "atbash"
+    "caesar"
+    "morse"
 
-#     "authority_endorsement"
-#     "misspellings"
-#     "misrepresentation"
-#     "technical_terms"
+    "authority_endorsement"
+    "misspellings"
+    "misrepresentation"
+    "technical_terms"
 
-#     "translate-fr"
-#     "translate-mr"
-#     "translate-zh-cn"
-#     "translate-ml"
-#     "translate-ta"
+    "translate-fr"
+    "translate-mr"
+    "translate-zh-cn"
+    "translate-ml"
+    "translate-ta"
 )
 
 save_dir_list=(
@@ -149,12 +154,12 @@ save_dir_list=(
     None
 )
 
-# prompt_cot_list=(1 2 3)
+# prompt_cot_list=(3)
 prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 1000"
+--eval_num 500"
 
 # Counter to distribute commands across GPUs
 counter=0
