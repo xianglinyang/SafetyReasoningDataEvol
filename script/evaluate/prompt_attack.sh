@@ -1,8 +1,9 @@
 #!/bin/bash
 per_gpu_jobs_num=1
-gpu_num=8
+
+gpu_num=2
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(0 1 2 3 4 5 6 7)
+gpu_ids=(0 1)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -21,6 +22,7 @@ model_name_or_path_list=(
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873" # reasoning ablation
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
 
+
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
@@ -35,6 +37,9 @@ model_name_or_path_list=(
 
     "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
     "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
+
+    "thu-ml/STAIR-Llama-3.1-8B-SFT"
+    "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
 
 )
 dataset_name_list=(
@@ -77,10 +82,10 @@ splits=(
     "slang"
     "evidence-based_persuasion"
 
-    "ascii"
-    "atbash"
-    "caesar"
-    "morse"
+    # "ascii"
+    # "atbash"
+    # "caesar"
+    # "morse"
 
     "authority_endorsement"
     "misspellings"
@@ -159,7 +164,7 @@ prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 500"
+--eval_num 240"
 
 # Counter to distribute commands across GPUs
 counter=0
