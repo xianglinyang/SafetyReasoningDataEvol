@@ -3,7 +3,7 @@
 per_gpu_jobs_num=1
 gpu_num=1  # number of GPUs
 jobs_num=$((per_gpu_jobs_num*gpu_num))  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
-available_gpu_ids=(7)
+available_gpu_ids=(0)
 
 model_name_or_path_list=(
     # "meta-llama/Llama-3.1-8B-Instruct"
@@ -33,8 +33,11 @@ model_name_or_path_list=(
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/outputs/circuitbreaker/llama2-13b_20250727-095351/checkpoint-194"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/outputs/circuitbreaker/llama2-13b_20250727-095351/checkpoint-291"
 
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
+
+    # "thu-ml/STAIR-Llama-3.1-8B-SFT"
+    "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
 
 )
 dataset_name_list=(

@@ -35,16 +35,16 @@ model_name_or_path_list=(
     # "meta-llama/Llama-2-13b-chat-hf"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/outputs/circuitbreaker/llama2-13b_20250727-095351/checkpoint-194"
 
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
-    "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
+    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
 
     "thu-ml/STAIR-Llama-3.1-8B-SFT"
     "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
 
 )
 dataset_name_list=(
-    "sorrybench"
-    # "advbench"
+    # "sorrybench"
+    "advbench"
     # "harmbench"
     # "harmbench_attack"
     
@@ -61,42 +61,42 @@ dataset_name_list=(
 )
 attack_name_list=(
     "none"
-    # "refusal_suppression"
-    # "prefix_injection"
+    "refusal_suppression"
+    "prefix_injection"
     # "base64"
     # "base64_input_only"
-    # "style_injection_short"
-    # "style_injection_json"
-    # "distractors"
-    # "disemvowel"
-    # "leetspeak"
-    # "poems"
+    "style_injection_short"
+    "style_injection_json"
+    "distractors"
+    "disemvowel"
+    "leetspeak"
+    "poems"
 )
 
 splits=(
-    # "train"
-    "logical_appeal"
-    "uncommon_dialects"
-    "role_play"
-    "expert_endorsement"
-    "slang"
-    "evidence-based_persuasion"
+    "train"
+    # "logical_appeal"
+    # "uncommon_dialects"
+    # "role_play"
+    # "expert_endorsement"
+    # "slang"
+    # "evidence-based_persuasion"
 
     # "ascii"
     # "atbash"
     # "caesar"
     # "morse"
 
-    "authority_endorsement"
-    "misspellings"
-    "misrepresentation"
-    "technical_terms"
+    # "authority_endorsement"
+    # "misspellings"
+    # "misrepresentation"
+    # "technical_terms"
 
-    "translate-fr"
-    "translate-mr"
-    "translate-zh-cn"
-    "translate-ml"
-    "translate-ta"
+    # "translate-fr"
+    # "translate-mr"
+    # "translate-zh-cn"
+    # "translate-ml"
+    # "translate-ta"
 )
 
 save_dir_list=(
@@ -164,7 +164,7 @@ prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 240"
+--eval_num 300"
 
 # Counter to distribute commands across GPUs
 counter=0
