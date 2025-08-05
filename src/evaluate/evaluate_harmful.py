@@ -762,7 +762,7 @@ async def evaluate_jailbreak(
     
     if "gpt_guard" in methodologies:
         unsafe_score = await gpt_guard_judge_fn(prompts, responses)
-        evaluation["gpt4_guard_asr"] = np.mean(unsafe_score)
+        evaluation["gpt_guard_asr"] = np.mean(unsafe_score)
         logger.info(f"Average GPTGuard ASR: {evaluation['gpt_guard_asr']}")
     
     # if "openai_moderator" in methodologies:
@@ -869,7 +869,7 @@ async def main():
         del llm
         torch.cuda.empty_cache()
 
-        evaluation = await evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching", "llamaguard3"], eval_device=eval_device)
+        evaluation = await evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching", "gpt_guard"], eval_device=eval_device)
     except Exception as e:
         logger.error(f"Error during evaluation: {e}")
         raise
