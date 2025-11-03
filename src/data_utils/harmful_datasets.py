@@ -10,6 +10,9 @@ Harmful datasets:
 import json
 from datasets import load_dataset
 from torch.utils.data import Dataset
+import numpy as np
+
+
 __datasets__ = [
     "jailbreakbench",
     "harmbench",
@@ -20,6 +23,11 @@ __datasets__ = [
     "circuitbreaker"
     "renellm"
     "xstest"
+    "wildchat"
+    "CSRT"
+    "CSRT_original"
+    "XSafety"
+    "PolyGuardMix"
 ]
 
 sorrybench_categories = [
@@ -213,6 +221,15 @@ def data_reader(dataset_name, split, save_dir=None):
             if types_of_harm == "Social stereotypes and unfair discrimination":
                 questions.append(prompt)
                 categories.append(specific_harms)
+    elif dataset_name == "DoNotAnswer":
+        # assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("LibrAI/do-not-answer")
+        data = ds['train']
+        for item in data:
+            prompt = item['question']
+            specific_harms = item['specific_harms']
+            questions.append(prompt)
+            categories.append(specific_harms)
 
     elif dataset_name == "CSRT":
         # assert split in ["train"], f"{dataset_name} does not have {split} splits."
@@ -220,6 +237,16 @@ def data_reader(dataset_name, split, save_dir=None):
         data = ds["train"]
         for item in data:
             prompt = item['prompt']
+            harms = item['harms']
+            questions.append(prompt)
+            categories.append(harms[0])
+    
+    elif dataset_name == "CSRT_original":
+        # assert split in ["train"], f"{dataset_name} does not have {split} splits."
+        ds = load_dataset("walledai/CSRT")
+        data = ds["train"]
+        for item in data:
+            prompt = item['original']
             harms = item['harms']
             questions.append(prompt)
             categories.append(harms[0])
@@ -231,8 +258,9 @@ def data_reader(dataset_name, split, save_dir=None):
         for item in data:
             prompt = item['text']
             category = item['category']
-            questions.append(prompt)
-            categories.append(category)
+            if category not in ["Ethics_And_Morality", "Ethics_And_Morality_n", "Goal_Hijacking", "Goal_Hijacking_n", "Mental_Health", "Mental_Health_n", "Reverse_Exposure", "Reverse_Exposure_n", "commonsense"]:
+                questions.append(prompt)
+                categories.append(category)
 
     elif dataset_name == "PolyGuardMix":
         # assert split in ["train"], f"{dataset_name} does not have {split} splits."
@@ -261,6 +289,16 @@ def data_reader(dataset_name, split, save_dir=None):
             if label == "yes":
                 questions.append(prompt)
                 categories.append(category)
+    elif dataset_name == "wildchat":
+        num=15000
+        ds = load_dataset("allenai/WildChat")
+        data = ds['train']
+        idxs = np.random.choice(range(len(data)), size=num, replace=False)
+        data = [data[int(i)] for i in idxs]
+        for item in data:
+            prompt = item['conversation'][0]['content']
+            questions.append(prompt)
+            categories.append("harmful")
     else:
         raise ValueError(f"{dataset_name} is not supported yet")
 
