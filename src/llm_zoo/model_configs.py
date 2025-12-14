@@ -38,6 +38,18 @@ MISTRAL_ASSISTANT_TAG="[/INST]"
 MISTRAL_SEP_TOKEN = " "
 MISTRAL_FORMATTED_PROMPT = "<s> [INST] {prompt} [/INST]"
 
+QWEN_DEFAULT_SYSTEM_PROMPT = """You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe. Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. Please ensure that your responses are socially unbiased and positive in nature. If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. If you don't know the answer to a question, please don't share false information."""
+QWEN_BEGIN_OF_TEXT = "<|im_start|>"
+QWEN_END_OF_TEXT = "<|im_end|>"
+QWEN_SYSTEM_TAG = "<|im_start|>system\n"
+QWEN_SYSTEM = "<|im_start|>system\n{}<|im_end|>\n".format(QWEN_DEFAULT_SYSTEM_PROMPT)
+QWEN_USER_TAG="<|im_start|>user\n"
+QWEN_ASSISTANT_TAG="<|im_start|>assistant\n"
+QWEN_SEP_TOKEN = "<|im_end|>"
+QWEN_PAD_TOKEN = "<|endoftext|>"
+QWEN_FORMATTED_PROMPT = "<|im_start|>user\n{prompt}<|im_end|>\n"
+
+
 def get_stop_tokens(model_name_or_path):
     model_name_lower = model_name_or_path.lower()
     if "llama-3" in model_name_lower or "llama3" in model_name_lower:
@@ -46,6 +58,8 @@ def get_stop_tokens(model_name_or_path):
         return [MISTRAL_END_OF_TEXT]
     elif "llama-2" in model_name_lower or "llama2" in model_name_lower:
         return [LLAMA2_END_OF_TEXT]
+    elif "qwen" in model_name_lower:
+        return [QWEN_END_OF_TEXT]
     else:
         raise ValueError(f"Not implemented for model: {model_name_or_path}")
 
@@ -60,5 +74,7 @@ def get_formatted_prompt(model_name_or_path, prompt):
         return MISTRAL_FORMATTED_PROMPT.format(prompt=prompt)
     elif "llama-2" in model_name_lower or "llama2" in model_name_lower:
         return LLAMA2_FORMATTED_PROMPT.format(prompt=prompt)
+    elif "qwen" in model_name_lower:
+        return QWEN_FORMATTED_PROMPT.format(prompt=prompt)
     else:
         raise ValueError(f"Not implemented for model: {model_name_or_path}")

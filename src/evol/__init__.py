@@ -13,7 +13,7 @@ __strategies__ = [
     "slang",
     "uncommon_dialects",
     "role_play",
-    "evidence-based_persuasion",
+    "evidence_based_persuasion",
     "logical_appeal",
     "expert_endorsement",
 ]

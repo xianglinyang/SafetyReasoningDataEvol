@@ -19,23 +19,23 @@ class RateLimitConfig:
     delay_between_calls: float = 0.0  # Delay between individual calls
 
 
-def limit_async_func_call(max_size: int = 1024):
-    """
-    Decorator to limit concurrent async function calls using a semaphore.
+# def limit_async_func_call(max_size: int = 1024):
+#     """
+#     Decorator to limit concurrent async function calls using a semaphore.
     
-    Args:
-        max_size: Maximum number of concurrent calls allowed
-    """
-    def decorator(func: Callable) -> Callable:
-        semaphore = asyncio.Semaphore(max_size)
+#     Args:
+#         max_size: Maximum number of concurrent calls allowed
+#     """
+#     def decorator(func: Callable) -> Callable:
+#         semaphore = asyncio.Semaphore(max_size)
         
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs) -> Any:
-            async with semaphore:
-                return await func(*args, **kwargs)
+#         @functools.wraps(func)
+#         async def wrapper(*args, **kwargs) -> Any:
+#             async with semaphore:
+#                 return await func(*args, **kwargs)
         
-        return wrapper
-    return decorator
+#         return wrapper
+#     return decorator
 
 
 class RateLimiter:
@@ -117,88 +117,95 @@ def rate_limited_async_call(config: RateLimitConfig):
     return decorator
 
 
-class BatchProcessor:
-    """
-    Utility for processing large batches with rate limiting.
-    """
+# class BatchProcessor:
+#     """
+#     Utility for processing large batches with rate limiting.
+#     """
     
-    def __init__(self, config: RateLimitConfig):
-        self.config = config
-        self.rate_limiter = RateLimiter(config)
+#     def __init__(self, config: RateLimitConfig):
+#         self.config = config
+#         self.rate_limiter = RateLimiter(config)
     
-    async def process_batch(self, items: list, processor_func: Callable, 
-                          batch_size: int = 50, delay_between_batches: float = 1.0,
-                          progress_callback: Optional[Callable] = None) -> list:
-        """
-        Process items in batches with rate limiting.
+#     async def process_batch(self, items: list, processor_func: Callable, 
+#                           batch_size: int = 50, delay_between_batches: float = 1.0,
+#                           progress_callback: Optional[Callable] = None) -> list:
+#         """
+#         Process items in batches with rate limiting.
         
-        Args:
-            items: List of items to process
-            processor_func: Async function to process each item
-            batch_size: Number of items to process in each batch
-            delay_between_batches: Delay between batches
-            progress_callback: Optional callback for progress updates
+#         Args:
+#             items: List of items to process
+#             processor_func: Async function to process each item
+#             batch_size: Number of items to process in each batch
+#             delay_between_batches: Delay between batches
+#             progress_callback: Optional callback for progress updates
             
-        Returns:
-            List of results
-        """
-        results = []
-        total_batches = (len(items) + batch_size - 1) // batch_size
+#         Returns:
+#             List of results
+#         """
+#         results = []
+#         total_batches = (len(items) + batch_size - 1) // batch_size
         
-        if progress_callback:
-            progress_callback(0, total_batches, f"Processing {len(items)} items in {total_batches} batches")
+#         if progress_callback:
+#             progress_callback(0, total_batches, f"Processing {len(items)} items in {total_batches} batches")
         
-        for i in range(0, len(items), batch_size):
-            batch_items = items[i:i + batch_size]
-            batch_num = i // batch_size + 1
+#         for i in range(0, len(items), batch_size):
+#             batch_items = items[i:i + batch_size]
+#             batch_num = i // batch_size + 1
             
-            if progress_callback:
-                progress_callback(batch_num, total_batches, f"Processing batch {batch_num}/{total_batches}")
+#             if progress_callback:
+#                 progress_callback(batch_num, total_batches, f"Processing batch {batch_num}/{total_batches}")
             
-            # Process current batch
-            tasks = []
-            for item in batch_items:
-                async def process_item(item=item):
-                    async with self.rate_limiter:
-                        return await processor_func(item)
-                tasks.append(process_item())
+#             # Process current batch
+#             tasks = []
+#             for item in batch_items:
+#                 async def process_item(item=item):
+#                     async with self.rate_limiter:
+#                         return await processor_func(item)
+#                 tasks.append(process_item())
             
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+#             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
             
-            # Handle exceptions
-            processed_results = []
-            for j, result in enumerate(batch_results):
-                if isinstance(result, Exception):
-                    print(f"Exception in batch {batch_num}, item {j}: {result}")
-                    processed_results.append(None)
-                else:
-                    processed_results.append(result)
+#             # Handle exceptions
+#             processed_results = []
+#             for j, result in enumerate(batch_results):
+#                 if isinstance(result, Exception):
+#                     print(f"Exception in batch {batch_num}, item {j}: {result}")
+#                     processed_results.append(None)
+#                 else:
+#                     processed_results.append(result)
             
-            results.extend(processed_results)
+#             results.extend(processed_results)
             
-            # Add delay between batches (except for the last batch)
-            if i + batch_size < len(items) and delay_between_batches > 0:
-                await asyncio.sleep(delay_between_batches)
+#             # Add delay between batches (except for the last batch)
+#             if i + batch_size < len(items) and delay_between_batches > 0:
+#                 await asyncio.sleep(delay_between_batches)
         
-        if progress_callback:
-            progress_callback(total_batches, total_batches, "Completed processing all items")
+#         if progress_callback:
+#             progress_callback(total_batches, total_batches, "Completed processing all items")
         
-        return results
+#         return results
 
 
 # Predefined configurations for common use cases
 OPENAI_RATE_LIMIT = RateLimitConfig(
-    max_calls=50,
-    calls_per_minute=3500,  # OpenAI's default rate limit
+    max_calls=7000,
+    calls_per_minute=7000,  # OpenAI's default rate limit
+    calls_per_second=500,
+    delay_between_calls=0.0
+)
+
+OPENROUTER_RATE_LIMIT = RateLimitConfig(
+    max_calls=7000,
+    calls_per_minute=1000,  # OpenAI's default rate limit
     calls_per_second=10,
     delay_between_calls=0.1
 )
 
 GEMINI_RATE_LIMIT = RateLimitConfig(
-    max_calls=50,
-    calls_per_minute=1500,  # Gemini's default rate limit
-    calls_per_second=5,
-    delay_between_calls=0.2
+    max_calls=7000,
+    calls_per_minute=7000,  # Gemini's default rate limit
+    calls_per_second=500,
+    delay_between_calls=0.0
 )
 
 CONSERVATIVE_RATE_LIMIT = RateLimitConfig(
@@ -207,3 +214,4 @@ CONSERVATIVE_RATE_LIMIT = RateLimitConfig(
     calls_per_second=3,
     delay_between_calls=0.5
 ) 
+

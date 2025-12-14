@@ -28,7 +28,7 @@ from typing import List
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from vllm import LLM, SamplingParams
 
-from src.logger.config import setup_logging
+from src.utils.logging_utils import setup_logging
 from src.llm_zoo.base_model import BaseLLM
 from src.llm_zoo.model_configs import get_formatted_prompt, get_stop_tokens
 
