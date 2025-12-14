@@ -13,6 +13,11 @@ Only provide the rephrased question as your response.
 {question}
 
 #### Rephrase Output
+Output {num} different variants of the question in the following format:
+{{
+	"variant_i": "...",
+	...
+}}
 """
 uncommon_dialects_prompt = """
 #### Instruction
@@ -29,6 +34,11 @@ Only provide the rephrased question as your response.
 {question}
 
 #### Rephrase Output
+Output {num} different variants of the question in the following format:
+{{
+	"variant_i": "...",
+	...
+}}
 """
 
 role_play_prompt = """
@@ -46,6 +56,11 @@ Only provide the rephrased question as your response.
 {question}
 
 #### Rephrase Output
+Output {num} different variants of the question in the following format:
+{{
+	"variant_i": "...",
+	...
+}}
 """
 
 evidence_based_persuasion_prompt = """
@@ -63,6 +78,11 @@ Only provide the rephrased question as your response.
 {question}
 
 #### Rephrase Output
+Output {num} different variants of the question in the following format:
+{{
+	"variant_i": "...",
+	...
+}}
 """
 
 logical_appeal_prompt = """
@@ -80,6 +100,11 @@ Only provide the rephrased question as your response.
 {question}
 
 #### Rephrase Output
+Output {num} different variants of the question in the following format:
+{{
+	"variant_i": "...",
+	...
+}}
 """
 
 expert_endorsement_prompt = """
@@ -97,6 +122,11 @@ Only provide the rephrased question as your response.
 {question}
 
 #### Rephrase Output
+Output {num} different variants of the question in the following format:
+{{
+	"variant_i": "...",
+	...
+}}
 """
 
 # -----------------selected examples-----------------
