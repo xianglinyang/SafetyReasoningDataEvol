@@ -18,7 +18,6 @@ import json
 import time
 from datetime import datetime
 import random
-from tqdm import tqdm
 import logging
 import torch
 import argparse
@@ -29,11 +28,12 @@ from typing import Dict
 
 from src.logger.config import setup_logging
 from src.llm_zoo.code_base_models import VLLMModel
+from src.llm_zoo import load_model
 from src.data_utils.reasoning_datasets import ReasoningDataset, batch_answer_cleansing_with_llm, batch_gt_answer_cleansing
 
 logger = logging.getLogger(__name__)
 
-async def process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name="gpt-4.1-nano"):
+async def process_evaluation(llm, dataset_name, questions, gt_answers, clean_model_name="openai/gpt-4.1-nano"):
     # 1. get the generated answers
     trigger = "Solve the following problem:\n\n"
     processed_questions = [trigger + question for question in questions]
@@ -159,7 +159,7 @@ async def main():
     parser.add_argument("--tensor_parallel_size", type=int, default=1)
     parser.add_argument("--torch_type", type=str, default="bf16", choices=["bf16", "fp16", "fp32"])
     parser.add_argument("--run_id", type=str, default=None)
-    parser.add_argument("--llm_model_name", type=str, default="gpt-4.1-nano")
+    parser.add_argument("--llm_model_name", type=str, default="openai/gpt-4.1-nano")
     args = parser.parse_args()
 
     setup_logging(task_name="evaluate_loss", run_id=args.run_id)
