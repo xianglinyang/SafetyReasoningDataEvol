@@ -43,7 +43,7 @@ import json
 from datasets import load_dataset
 from torch.utils.data import Dataset
 
-from src.llm_zoo.api_base_models import OpenAIModel
+from src.llm_zoo import load_model
 
 def data_reader(dataset_name, split):
     questions = list()
@@ -423,8 +423,8 @@ def answer_cleansing_with_regex(dataset, llm_answer):
 
     return answer
 
-async def batch_answer_cleansing_with_llm(dataset, questions, llm_answers, llm_model_name="gpt-4.1-nano"):
-    llm = OpenAIModel(model_name=llm_model_name)
+async def batch_answer_cleansing_with_llm(dataset, questions, llm_answers, llm_model_name="openai/gpt-4.1-nano"):
+    llm = load_model(llm_model_name)
     trigger = zero_shot_answer_trigger(dataset)
     prompt = """\
     You are a helpful assistant.
@@ -449,11 +449,11 @@ async def batch_answer_cleansing_with_llm(dataset, questions, llm_answers, llm_m
     responses = await llm.batch_invoke(prompts)
     return responses
 
-def answer_cleansing_with_llm(dataset, question, answer):
+def answer_cleansing_with_llm(dataset, question, answer, llm_model_name="openai/gpt-4.1-nano"):
     # use 4o-mini or 7b model to extract the answer from the reasoning output
     # Currently, we use 4o-mini model to extract the answer from the reasoning output
-    llm = OpenAIModel(model_name="gpt-4o-mini")
 
+    llm = load_model(llm_model_name)
     prompt = f"""\
     You are a helpful assistant.
     Your task is to extract the student's answer according to the provided standard from a question and reasoning paragraph, or return "[INVALID]" if there is no identifiable answer in the paragraph.
