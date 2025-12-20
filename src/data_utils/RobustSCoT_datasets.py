@@ -1,10 +1,11 @@
 import json
 import random
-from typing import Dict, List
+from typing import Dict
 
 import torch
 import transformers
 from torch.utils.data import Dataset
+import numpy as np
 
 '''Dataset for Safety Reasoning'''
 class SafetyReasoningDataset(Dataset):
@@ -16,8 +17,7 @@ class SafetyReasoningDataset(Dataset):
                 tokenizer: transformers.PreTrainedTokenizer, 
                 max_length: int = 2048,
                 include_variants=True,
-                include_reasoning=True,
-                demo_selected_strategy="diverse"
+                include_reasoning=True
                 ):
         super(SafetyReasoningDataset, self).__init__()
         self.model_name = model_name
@@ -25,92 +25,48 @@ class SafetyReasoningDataset(Dataset):
         self.max_length = max_length
         self.include_variants = include_variants
         self.include_reasoning = include_reasoning
-        self.demo_selected_strategy = demo_selected_strategy
         self._load_data(dataset_name, split)
 
     def _load_data(self, dataset_name, split):
         # ======================= Circuitbreaker ======================= #
-        # circuitbreaker original data+ processed data
-        if split == "train":
-            if self.demo_selected_strategy == "diverse":
-                data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
-            else:
-                data_path = f"data/processed/{dataset_name}_{split}_{self.demo_selected_strategy}.json"
-        else:
-            data_path = f"data/processed/{dataset_name}_{split}_metadata_final.json"
-        
+        data_path = f"data/processed/STAIR-SFT_diverse.json"
+
         with open(data_path, 'r') as f:
-            circuitbreaker = json.load(f)
-        # for faster computation
-        # circuitbreaker = circuitbreaker[:len(circuitbreaker)//2]
-        if split == 'val':
-            circuitbreaker = circuitbreaker[:100]
-    
+            dataset = json.load(f)
+        length = len(dataset)
+        if split == 'train':
+            dataset = dataset[:int(length*0.995)]
+        elif split == 'val':
+            dataset = dataset[int(length*0.995):]
+        
         self.refusal_dataset = list()
         # original data with evolved question and answer
-        for data in circuitbreaker:
-            question_variants = data['evolved_variants']
-            question = data['prompt']
-            answer = data['evolved_answer_modified']
-
-            if self.include_reasoning:
-                answer = self._simple_answer(answer)
-            else:
-                answer = data['llama3_output']
+        for data in dataset:
+            answer = data['cot']+ "\n"+data['answer']
+            source = data['source']
+            # if source == 'PKU-SafeRLHF':
+            #     prob = np.random.rand()
+            #     if prob < 0.5:
+            #         question = data['instruction']
+            #     else:
+            #         try:
+            #             mutations = data['mutations']
+            #             question = random.choice(mutations)['text']
+            #         except:
+            #             question = data['instruction']
+            # else:
+            #     question = data['instruction']
+            question = data['instruction']
 
             self.refusal_dataset.append({
                 "question": question,
                 "answer": answer
             })
 
-            if self.include_variants:   
-                # Randomly select one variant from question_variants if available
-                variant_questions = [q for _, q in question_variants.items()]
-                question = random.choice(variant_questions)
-                self.refusal_dataset.append({
-                    "question": question,
-                    "answer": answer
-                })
         random.shuffle(self.refusal_dataset)
         print("refusal_dataset length:", len(self.refusal_dataset))
-            
-        # ==========================  Retain ========================== #
-        # dolly dataset
-        data_path = f"data/processed/dolly_{split}_metadata_final.json"
-        with open(data_path, 'r') as f:
-            dolly = json.load(f)
-        if split == 'val':
-            dolly = dolly[:100]
-        
-        self.retain_dataset = list()
-        for data in dolly:
-            question = data['evolved_question']
-            answer = data['evolved_answer_modified']
-
-            # clean format
-            output = data[self.model_name]
-            if output.startswith('assistant\n\n'):
-                output = output[10:]
-            
-            if self.include_reasoning:
-                refusal_part = answer.split('#### Response')[0]
-                new_answer = refusal_part+"#### Response\n"+output
-            else:
-                new_answer = output
-
-            self.retain_dataset.append({
-                "question": question,
-                "answer": new_answer
-            })
-
-        # shuffle the dataset
-        random.shuffle(self.retain_dataset)
-        print("retain_dataset length:", len(self.retain_dataset))
     
-    def _simple_answer(self, answer):
-        reasoning_part = answer.split('#### Response')[0]
-        simple_answer = "#### Response\nI cannot help with that."
-        return reasoning_part + simple_answer
+
     
     def _format_data(self, question, answer):
         # Format messages for refusal dataset and retain dataset
@@ -154,20 +110,10 @@ class SafetyReasoningDataset(Dataset):
         refusal_question = refusal_example['question']
         refusal_answer = refusal_example['answer']
         refusal_inputs = self._format_data(refusal_question, refusal_answer)
-
-        # retain example
-        retain_example = self.retain_dataset[i % len(self.retain_dataset)]
-        retain_question = retain_example['question']
-        retain_answer = retain_example['answer']
-        retain_inputs = self._format_data(retain_question, retain_answer)
-
         model_inputs = dict(
             input_ids=refusal_inputs['input_ids'],
             attention_mask=refusal_inputs['attention_mask'],
-            labels=refusal_inputs['labels'],
-            retain_input_ids=retain_inputs['input_ids'],
-            retain_attention_mask=retain_inputs['attention_mask'],
-            retain_labels=retain_inputs['labels']
+            labels=refusal_inputs['labels']
         )
         return model_inputs
 
@@ -178,15 +124,13 @@ if __name__ == "__main__":
     tokenizer.pad_token = tokenizer.eos_token
     train_dataset = SafetyReasoningDataset(
         model_name="meta-llama/Llama-3.1-8B-Instruct",
-        dataset_name="circuitbreaker",
+        dataset_name="STAIR-SFT_diverse",
         split="train",
         tokenizer=tokenizer,
         max_length=2048,
         include_variants=True,
-        include_reasoning=True,
-        demo_selected_strategy="diverse"
+        include_reasoning=True
     )
     print(train_dataset.refusal_dataset[0])
-    print(train_dataset.retain_dataset[0])
 
     
