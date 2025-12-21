@@ -7,12 +7,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 class RobustCoTTrainer(Trainer):
-    def __init__(self, alpha, total_steps, benign_lambda, *args, **kwargs):
+    def __init__(self, total_steps, benign_lambda, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # incase
         self.args.remove_unused_columns = False
         self.current_training_step = 0
-        self.alpha = alpha
         self.total_steps = total_steps
         self.benign_lambda = benign_lambda
     
