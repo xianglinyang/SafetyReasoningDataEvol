@@ -15,14 +15,21 @@ def load_dataset(dataset_name: str):
         data_path = os.path.join(DATA_DIR, f'STAIR-SFT_diverse.json')
         with open(data_path, 'r') as f:
             dataset = json.load(f)
-        new_dataset = []
+        new_benign_dataset = []
+        new_harmful_dataset = []
         for data in dataset:
-            new_dataset.append({
-                "question": data['instruction'],
-                "answer": data['cot'] + "\n" + data['answer'],
-                "mutations": data['mutations']
-            })
-        return new_dataset
+            if data['source'] == 'PKU-SafeRLHF':
+                new_harmful_dataset.append({
+                    "question": data['instruction'],
+                    "answer": data['cot'] + "\n" + data['answer'],
+                    "mutations": data['mutations']
+                })
+            else:
+                new_benign_dataset.append({
+                    "question": data['instruction'],
+                    "answer": data['cot'] + "\n" + data['answer'],
+                })
+        return new_benign_dataset, new_harmful_dataset
     else:
         raise ValueError(f"Dataset {dataset_name} not found")
 
