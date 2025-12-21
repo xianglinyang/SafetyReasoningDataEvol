@@ -39,7 +39,7 @@ def dump_json(dataset, file_path):
     logger.info(f"Dataset saved to {file_path}")
 
 #-------------------------Data Processing-------------------------
-async def mutate_dataset(dataset_name, llm_name, num=18, demo_selected_strategy="diverse"):
+async def mutate_dataset(dataset_name, llm_name, num_variants=18, alpha=0.5, demo_selected_strategy="diverse"):
     logger.info(f"Processing {dataset_name} dataset...")
     
     processed_file_path = os.path.join(PROCESSED_DATA_DIR, f'{dataset_name}_{demo_selected_strategy}.json')
@@ -59,7 +59,7 @@ async def mutate_dataset(dataset_name, llm_name, num=18, demo_selected_strategy=
     questions = [data['instruction'] for data in dataset]
 
     evolver = QuestionEvol()
-    question_variants = await evolver.generate_prompt_variants_batch(questions, llm_client, num, demo_selected_strategy)
+    question_variants = await evolver.generate_prompt_variants_batch(questions, llm_client, num_variants, alpha, demo_selected_strategy)
 
     for data, question_variant in tqdm(zip(dataset, question_variants), desc="Evolving dataset"):
         data['mutations'] = question_variant['mutations']

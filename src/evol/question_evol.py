@@ -38,9 +38,9 @@ class QuestionEvol:
 	def strategies(self):
 		return self._strategies
 	
-	def create_variants_prompt(self, strategy, instruction, num, demo_selected_strategy="diverse"):
+	def create_variants_prompt(self, strategy, instruction, num, alpha, demo_selected_strategy="diverse"):
 		examples = examples_dict[demo_selected_strategy][strategy]
-		prompt = prompt_dict[strategy].format(examples=examples, question=instruction, num=num)
+		prompt = prompt_dict[strategy].format(examples=examples, question=instruction, num=num, alpha=alpha)
 		return prompt
 	
 	def _parse_variants_response(self, response, expected_count):
