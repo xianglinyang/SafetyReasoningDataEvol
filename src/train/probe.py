@@ -266,7 +266,7 @@ def probe_operator_gradient_direction(
         List of dicts, each dict contains:
             - "question": str,
             - "answer": str
-            - "mutations": Dict[str, float]
+            - "probe_results": Dict[str, float]
             {
             "strategy": avg(loss_i) - loss_original,
             }
@@ -347,7 +347,7 @@ def probe_operator_gradient_direction(
             'question': data['question'],
             'answer': data['answer'],
             'original_loss': original_loss,
-            'mutations': strategy_avg_diffs
+            'probe_results': strategy_avg_diffs
         })
     
     return results
@@ -361,7 +361,7 @@ if __name__ == "__main__":
 
     dataset_name = "STAIR-SFT_diverse"
     _, dataset = load_dataset(dataset_name)
-    dataset = dataset[:100]
+    dataset = dataset[:50]
 
     # questions = [data['question'] for data in dataset]
     # answers = [data['answer'] for data in dataset]
@@ -382,8 +382,18 @@ if __name__ == "__main__":
         max_length=2048,
         device="cuda:0",
         use_amp=True
-    )
+     )
     for result in results:
-        for strategy, loss in result['mutations'].items():
+        for strategy, loss in result['probe_results'].items():
             print(f"{strategy}: {loss}")
         print("-"*100)
+    
+    from src.train.targeted_generation import select_strategies
+    new_dataset = select_strategies(results, top_ratio=0.1)
+
+    for data in new_dataset:
+        print(data['selected_strategy'])
+        print(data['is_mask'])
+        print("-"*100)
+    
+    
