@@ -24,7 +24,7 @@ import asyncio
 from datetime import datetime
 from abc import ABC, abstractmethod
 from vllm import LLM, SamplingParams
-from llm_zoo import load_model
+from src.llm_zoo import load_model
 
 from src.llm_zoo.code_base_models import VLLMModel
 from src.logger.config import setup_logging
@@ -651,7 +651,7 @@ async def evaluate_jailbreak(
     prompts: List[str],
     responses: List[str],
     categories: List[str],
-    methodologies: List[str]=["substring_matching", "harmbench_cls", "gpt_guard"],
+    methodologies: List[str]=["substring_matching", "harmbench_cls",],
     eval_device: str="cuda"
 ):
 
@@ -679,10 +679,10 @@ async def evaluate_jailbreak(
         evaluation["harmbench_asr"] = np.mean(unsafe_score)
         logger.info(f"Average Harmbench ASR: {evaluation['harmbench_asr']}")
     
-    if "gpt_guard" in methodologies:
-        unsafe_score = gpt_guard_judge_fn(prompts, responses)
-        evaluation["gpt_guard_asr"] = np.mean(unsafe_score)
-        logger.info(f"Average GPTGuard ASR: {evaluation['gpt_guard_asr']}")
+    # if "gpt_guard" in methodologies:
+    #     unsafe_score = gpt_guard_judge_fn(prompts, responses)
+    #     evaluation["gpt_guard_asr"] = np.mean(unsafe_score)
+    #     logger.info(f"Average GPTGuard ASR: {evaluation['gpt_guard_asr']}")
 
     return evaluation
 
