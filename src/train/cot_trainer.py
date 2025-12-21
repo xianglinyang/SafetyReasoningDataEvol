@@ -1,16 +1,13 @@
 import os
-import shutil
 import torch
 from transformers import Trainer
 from tqdm import tqdm
 import logging
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
 
 logger = logging.getLogger(__name__)
 
-class SafetyCoTTrainer(Trainer):
-    def __init__(self, alpha, total_steps, benign_lambda, harmful_lambda, *args, **kwargs):
+class RobustCoTTrainer(Trainer):
+    def __init__(self, alpha, total_steps, benign_lambda, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # incase
         self.args.remove_unused_columns = False
@@ -18,7 +15,6 @@ class SafetyCoTTrainer(Trainer):
         self.alpha = alpha
         self.total_steps = total_steps
         self.benign_lambda = benign_lambda
-        self.harmful_lambda = harmful_lambda
     
     def get_training_progress(self):
         # return self.current_training_step / self.total_steps
@@ -32,23 +28,23 @@ class SafetyCoTTrainer(Trainer):
         device = self.args.device
 
         # Prepare refusal inputs
-        refusal_inputs = {
+        benign_inputs = {
             'input_ids': inputs.get('input_ids').to(device),
             'attention_mask': inputs.get('attention_mask').to(device),
             'labels': inputs.get('labels').to(device)
         }
 
         # Prepare retain inputs
-        retain_inputs = {
-            'input_ids': inputs.get('retain_input_ids').to(device),
-            'attention_mask': inputs.get('retain_attention_mask').to(device),
-            'labels': inputs.get('retain_labels').to(device)
+        adv_inputs = {
+            'input_ids': inputs.get('adv_input_ids').to(device),
+            'attention_mask': inputs.get('adv_attention_mask').to(device),
+            'labels': inputs.get('adv_labels').to(device)
         }
 
         # Return a dictionary containing both refusal and retain inputs
         return dict(
-            refusal_inputs=refusal_inputs,
-            retain_inputs=retain_inputs
+            benign_inputs=benign_inputs,
+            adv_inputs=adv_inputs
         )
     
     def compute_loss(self, model, inputs, return_outputs=False):
@@ -57,25 +53,26 @@ class SafetyCoTTrainer(Trainer):
         """
         self.current_training_step += 1
 
-        refusal_inputs = inputs['refusal_inputs']
-        retain_inputs = inputs['retain_inputs']
+        benign_inputs = inputs['benign_inputs']
+        adv_inputs = inputs['adv_inputs']
         
         # Calculate loss for refusal examples
-        refusal_outputs = model(**refusal_inputs)
-        refusal_loss = refusal_outputs.loss
+        benign_outputs = model(**benign_inputs)
+        benign_loss = benign_outputs.loss
         
         # Calculate loss for retain examples
-        retain_outputs = model(**retain_inputs)
-        retain_loss = retain_outputs.loss
+        adv_outputs = model(**adv_inputs)
+        adv_loss = adv_outputs.loss
 
-        retain_coeff, refusal_coeff = self.benign_lambda, self.harmful_lambda
+        benign_coeff = self.benign_lambda
+        harmful_coeff = self.harmful_lambda
 
-        total_loss = retain_coeff * retain_loss + refusal_coeff * refusal_loss
-        logger.info(f"total_loss: {total_loss:.4f} || retain_loss/weighted: {retain_loss:.4f} {retain_coeff*retain_loss:.4f} || refusal_loss/weighted: {refusal_loss:.4f} {refusal_coeff*refusal_loss:.4f}")
+        total_loss = benign_coeff * benign_loss + harmful_coeff * adv_loss
+        logger.info(f"total_loss: {total_loss:.4f} || benign_loss/weighted: {benign_loss:.4f} {benign_coeff*benign_loss:.4f} || adv_loss/weighted: {adv_loss:.4f} {harmful_coeff*adv_loss:.4f}")
         if return_outputs:
             return (total_loss, {
-                "refusal_outputs": refusal_outputs,
-                "retain_outputs": retain_outputs
+                "benign_outputs": benign_outputs,
+                "adv_outputs": adv_outputs
             })
         return total_loss
     
@@ -101,8 +98,8 @@ class SafetyCoTTrainer(Trainer):
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         model = self.model.eval()
         
-        refusal_loss_sum = 0
-        retain_loss_sum = 0
+        benign_loss_sum = 0
+        adv_loss_sum = 0
         num_batches = 0
         
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
@@ -110,39 +107,33 @@ class SafetyCoTTrainer(Trainer):
                 inputs = self._prepare_inputs(batch)
                 
                 # Get losses for both types of examples
-                refusal_outputs = model(**inputs['refusal_inputs'])
-                retain_outputs = model(**inputs['retain_inputs'])
+                benign_outputs = model(**inputs['benign_inputs'])
+                adv_outputs = model(**inputs['adv_inputs'])
                 
-                refusal_loss_sum += refusal_outputs.loss.item()
-                retain_loss_sum += retain_outputs.loss.item()
+                benign_loss_sum += benign_outputs.loss.item()
+                adv_loss_sum += adv_outputs.loss.item()
                 num_batches += 1
         
         # Calculate average losses
-        avg_refusal_loss = refusal_loss_sum / num_batches
-        avg_retain_loss = retain_loss_sum / num_batches
+        avg_benign_loss = benign_loss_sum / num_batches
+        avg_adv_loss = adv_loss_sum / num_batches
         
         # Calculate total loss using the current training progress coefficients
         scheduled_coeff = self.get_training_progress()
-        retain_coeff = self.alpha * scheduled_coeff
+        benign_coeff = self.alpha * scheduled_coeff
         refusal_coeff = self.alpha * (1 - scheduled_coeff)
         total_loss = retain_coeff * avg_retain_loss + refusal_coeff * avg_refusal_loss
         
         metrics = {
             "eval_loss": total_loss,
-            "eval_refusal_loss": avg_refusal_loss,
-            "eval_retain_loss": avg_retain_loss,
-            "eval_retain_loss_weighted": retain_coeff * avg_retain_loss,
-            "eval_refusal_loss_weighted": refusal_coeff * avg_refusal_loss,
+            "eval_benign_loss": avg_benign_loss,
+            "eval_adv_loss": avg_adv_loss,
+            "eval_adv_loss_weighted": harmful_coeff * avg_adv_loss,
+            "eval_benign_loss_weighted": benign_coeff * avg_benign_loss,
         }
         
         return metrics
     
-    # def save_model(self, output_dir: str, _internal_call: bool = False):
-    # bug: merge_and_unload modifies loaded_peft_model in-place and returns the base model
-    #     merged_model = self.model.merge_and_unload()
-
-    #     merged_model.save_pretrained(output_dir)
-    #     self.tokenizer.save_pretrained(output_dir)
 
     def save_model(self, output_dir: str, _internal_call: bool = False):
         """
