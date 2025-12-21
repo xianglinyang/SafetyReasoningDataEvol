@@ -1,4 +1,5 @@
 import numpy as np
+import random
 
 def select_strategies(harmful_dataset_with_losses, top_ratio=0.1):
     """
@@ -14,6 +15,8 @@ def select_strategies(harmful_dataset_with_losses, top_ratio=0.1):
             # randomly choose a strategy
             strategy = random.choice(list(data['probe_results'].keys()))
             loss_diff = data['probe_results'][strategy]
+            losses.append(loss_diff)
+            strategies.append(strategy)
         else:
             strategy, loss_diff = max(data['probe_results'].items(), key=lambda x: x[1])
             losses.append(loss_diff)
