@@ -20,22 +20,34 @@ class DataArguments:
             "help": "The maximum total input sequence length after tokenization."
         }
     )
-    include_variants: Optional[bool] = field(
-        default=True,
-        metadata={
-            "help": "Whether to include variants in the dataset"
-        }
-    )
-    include_reasoning: Optional[bool] = field(
-        default=True,
-        metadata={
-            "help": "Whether to include reasoning in the dataset"
-        }
-    )
     demo_selected_strategy: Optional[str] = field(
         default="diverse",
         metadata={
             "help": "The strategy to select the demo examples"
+        }
+    )
+    mutation_num: Optional[int] = field(
+        default=5,
+        metadata={
+            "help": "The number of mutations to generate for each example"
+        }
+    )
+    mutation_alpha: Optional[float] = field(
+        default=0.9,
+        metadata={
+            "help": "The alpha for the mutations"
+        }
+    )
+    mutation_llm: Optional[str] = field(
+        default="openai/gpt-4.1",
+        metadata={
+            "help": "The LLM to use for the mutations"
+        }
+    )
+    mutation_top_ratio: Optional[float] = field(
+        default=0.3,
+        metadata={
+            "help": "The ratio of the mutations to select"
         }
     )
 
@@ -52,6 +64,12 @@ class ModelArguments:
                 "The model checkpoint for weights initialization. Don't set if you want to train a model from scratch."
             )
         },
+    )
+    model_nickname: str = field(
+        default=None,
+        metadata={
+            "help": "The nickname for the model"
+        }
     )
     benign_lambda: Optional[float] = field(
         default=1,
@@ -222,6 +240,12 @@ class TrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The run id for the training."
+        },
+    )
+    dataset_log_dir: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "The directory to store the dataset logs."
         },
     )
 

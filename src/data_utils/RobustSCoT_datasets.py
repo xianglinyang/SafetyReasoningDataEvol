@@ -1,7 +1,8 @@
 import json
 import random
 import os
-from typing import Dict, List
+from typing import Dict, List, Any
+from dataclasses import dataclass
 
 import torch
 import transformers
@@ -112,6 +113,32 @@ class SafetyReasoningDataset(Dataset):
             model_inputs['adv_labels'] = normal_inputs['labels'].clone()
         
         return model_inputs
+
+
+@dataclass
+class SafetyDataCollator:
+    """
+    Custom data collator that handles special fields like data_type and is_adv
+    """
+    tokenizer: transformers.PreTrainedTokenizer
+    
+    def __call__(self, features: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Separate special fields from tensor fields
+        data_types = [f.pop('data_type') for f in features]
+        is_adv = torch.stack([f.pop('is_adv') for f in features])
+        
+        # Use standard collator for tensor fields
+        batch = self.tokenizer.pad(
+            features,
+            padding=True,
+            return_tensors='pt',
+        )
+        
+        # Add back special fields
+        batch['data_type'] = data_types  # Keep as list of strings
+        batch['is_adv'] = is_adv  # Already a tensor
+        
+        return batch
 
 
 if __name__ == "__main__":

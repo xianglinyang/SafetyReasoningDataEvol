@@ -7,17 +7,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 class RobustCoTTrainer(Trainer):
-    def __init__(self, total_steps, benign_lambda, *args, **kwargs):
+    def __init__(self, total_steps, benign_lambda, harmful_lambda, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # incase
         self.args.remove_unused_columns = False
         self.current_training_step = 0
         self.total_steps = total_steps
         self.benign_lambda = benign_lambda
+        self.harmful_lambda = harmful_lambda
     
     def get_training_progress(self):
-        # return self.current_training_step / self.total_steps
-        return self.current_training_step / 1248/4
+        return self.current_training_step / self.total_steps
     
     def _prepare_inputs(self, inputs):
         """
@@ -26,51 +26,63 @@ class RobustCoTTrainer(Trainer):
         # Ensure inputs are on the correct device
         device = self.args.device
 
-        # Prepare refusal inputs
+        # Prepare normal inputs
         benign_inputs = {
             'input_ids': inputs.get('input_ids').to(device),
             'attention_mask': inputs.get('attention_mask').to(device),
             'labels': inputs.get('labels').to(device)
         }
 
-        # Prepare retain inputs
+        # Prepare adversarial inputs
         adv_inputs = {
             'input_ids': inputs.get('adv_input_ids').to(device),
             'attention_mask': inputs.get('adv_attention_mask').to(device),
             'labels': inputs.get('adv_labels').to(device)
         }
 
-        # Return a dictionary containing both refusal and retain inputs
+        # Get data type and adversarial mask
+        data_types = inputs.get('data_type')  # List of 'benign' or 'harmful'
+        is_adv = inputs.get('is_adv').to(device)  # Tensor mask for adversarial examples
+
+        # Return a dictionary containing both normal and adv inputs
         return dict(
             benign_inputs=benign_inputs,
-            adv_inputs=adv_inputs
+            adv_inputs=adv_inputs,
+            data_types=data_types,
+            is_adv=is_adv
         )
     
     def compute_loss(self, model, inputs, return_outputs=False):
         """
-        Custom loss computation for both refusal and retain examples
+        Custom loss computation for both benign and harmful examples with adversarial masking
+        Loss formula: benign_lambda * (all normal losses) + harmful_lambda * (harmful adversarial losses)
         """
         self.current_training_step += 1
 
         benign_inputs = inputs['benign_inputs']
         adv_inputs = inputs['adv_inputs']
+        # is_adv_mask = inputs['is_adv'].float()  # [batch_size], 1 if has adversarial mutation, 0 otherwise
         
-        # Calculate loss for refusal examples
-        benign_outputs = model(**benign_inputs)
-        benign_loss = benign_outputs.loss
-        
-        # Calculate loss for retain examples
+        # Calculate logits for normal and adversarial examples
+        normal_outputs = model(**benign_inputs)
         adv_outputs = model(**adv_inputs)
+
+        normal_loss = normal_outputs.loss
         adv_loss = adv_outputs.loss
 
         benign_coeff = self.benign_lambda
         harmful_coeff = self.harmful_lambda
 
-        total_loss = benign_coeff * benign_loss + harmful_coeff * adv_loss
-        logger.info(f"total_loss: {total_loss:.4f} || benign_loss/weighted: {benign_loss:.4f} {benign_coeff*benign_loss:.4f} || adv_loss/weighted: {adv_loss:.4f} {harmful_coeff*adv_loss:.4f}")
+        # Combine losses: benign_lambda * (all normal) + harmful_lambda * (harmful adv only)
+        total_loss = benign_coeff * normal_loss + harmful_coeff * adv_loss
+    
+        logger.info(f"total_loss: {total_loss:.4f} || "
+                   f"normal_loss: {normal_loss:.4f} (w:{benign_coeff*normal_loss:.4f}) || "
+                   f"adv_loss: {adv_loss:.4f} (w:{harmful_coeff*adv_loss:.4f})")
+        
         if return_outputs:
             return (total_loss, {
-                "benign_outputs": benign_outputs,
+                "normal_outputs": normal_outputs,
                 "adv_outputs": adv_outputs
             })
         return total_loss
@@ -92,44 +104,104 @@ class RobustCoTTrainer(Trainer):
     
     def evaluate(self, eval_dataset=None, ignore_keys=None):
         """
-        Custom evaluation method that evaluates both refusal and retain examples separately
+        Custom evaluation method that evaluates benign and harmful examples separately
         """
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         model = self.model.eval()
         
-        benign_loss_sum = 0
-        adv_loss_sum = 0
-        num_batches = 0
+        all_normal_losses = []
+        all_adv_losses = []
+        all_is_adv = []
+        
+        loss_fct = torch.nn.CrossEntropyLoss(reduction='none')
         
         for batch in tqdm(eval_dataloader, desc="Evaluating"):
             with torch.no_grad():
                 inputs = self._prepare_inputs(batch)
+                is_adv_mask = inputs['is_adv']
                 
-                # Get losses for both types of examples
-                benign_outputs = model(**inputs['benign_inputs'])
-                adv_outputs = model(**inputs['adv_inputs'])
+                benign_inputs = inputs['benign_inputs']
+                adv_inputs = inputs['adv_inputs']
+                batch_size = benign_inputs['input_ids'].shape[0]
                 
-                benign_loss_sum += benign_outputs.loss.item()
-                adv_loss_sum += adv_outputs.loss.item()
-                num_batches += 1
+                # Get logits for both normal and adversarial inputs
+                normal_outputs = model(**benign_inputs)
+                adv_outputs = model(**adv_inputs)
+                
+                normal_logits = normal_outputs.logits
+                adv_logits = adv_outputs.logits
+                
+                normal_labels = benign_inputs['labels']
+                adv_labels = adv_inputs['labels']
+                
+                # Compute per-sample losses
+                normal_logits_flat = normal_logits.view(-1, normal_logits.size(-1))
+                normal_labels_flat = normal_labels.view(-1)
+                normal_loss_per_token = loss_fct(normal_logits_flat, normal_labels_flat)
+                normal_loss_per_token = normal_loss_per_token.view(batch_size, -1)
+                
+                adv_logits_flat = adv_logits.view(-1, adv_logits.size(-1))
+                adv_labels_flat = adv_labels.view(-1)
+                adv_loss_per_token = loss_fct(adv_logits_flat, adv_labels_flat)
+                adv_loss_per_token = adv_loss_per_token.view(batch_size, -1)
+                
+                # Mask out ignored tokens
+                normal_mask = (normal_labels != -100).float()
+                adv_mask = (adv_labels != -100).float()
+                
+                # Compute per-sample loss
+                normal_loss_per_sample = (normal_loss_per_token * normal_mask).sum(dim=1) / (normal_mask.sum(dim=1) + 1e-10)
+                adv_loss_per_sample = (adv_loss_per_token * adv_mask).sum(dim=1) / (adv_mask.sum(dim=1) + 1e-10)
+                
+                # Collect losses - move to CPU immediately to free GPU memory
+                all_normal_losses.append(normal_loss_per_sample.cpu())
+                all_adv_losses.append(adv_loss_per_sample.cpu())
+                all_is_adv.append(is_adv_mask.cpu())
+                
+                # Clean up GPU tensors
+                del normal_outputs, adv_outputs, normal_logits, adv_logits
+                del normal_loss_per_token, adv_loss_per_token, normal_mask, adv_mask
+                del normal_loss_per_sample, adv_loss_per_sample
         
-        # Calculate average losses
-        avg_benign_loss = benign_loss_sum / num_batches
-        avg_adv_loss = adv_loss_sum / num_batches
+        # Concatenate all batches (on CPU)
+        all_normal_losses = torch.cat(all_normal_losses)
+        all_adv_losses = torch.cat(all_adv_losses)
+        all_is_adv = torch.cat(all_is_adv).float()
         
-        # Calculate total loss using the current training progress coefficients
-        scheduled_coeff = self.get_training_progress()
-        benign_coeff = self.alpha * scheduled_coeff
-        refusal_coeff = self.alpha * (1 - scheduled_coeff)
-        total_loss = retain_coeff * avg_retain_loss + refusal_coeff * avg_refusal_loss
+        # Vectorized computation
+        avg_normal_loss = all_normal_losses.mean().item()
+        
+        harmful_adv_count = all_is_adv.sum().item()
+        if harmful_adv_count > 0:
+            avg_harmful_adv_loss = ((all_adv_losses * all_is_adv).sum() / harmful_adv_count).item()
+        else:
+            avg_harmful_adv_loss = 0.0
+        
+        # Calculate total loss using coefficients
+        benign_coeff = self.benign_lambda
+        harmful_coeff = self.harmful_lambda
+        
+        total_loss = benign_coeff * avg_normal_loss + harmful_coeff * avg_harmful_adv_loss
+        
+        # Record total samples before cleanup
+        total_samples = len(all_normal_losses)
+        
+        # Clean up CPU tensors
+        del all_normal_losses, all_adv_losses, all_is_adv
         
         metrics = {
             "eval_loss": total_loss,
-            "eval_benign_loss": avg_benign_loss,
-            "eval_adv_loss": avg_adv_loss,
-            "eval_adv_loss_weighted": harmful_coeff * avg_adv_loss,
-            "eval_benign_loss_weighted": benign_coeff * avg_benign_loss,
+            "eval_normal_loss": avg_normal_loss,
+            "eval_adv_loss": avg_harmful_adv_loss,
+            "eval_normal_loss_weighted": benign_coeff * avg_normal_loss,
+            "eval_adv_loss_weighted": harmful_coeff * avg_harmful_adv_loss,
+            "eval_adv_count": int(harmful_adv_count),
+            "eval_total_samples": total_samples,
         }
+        
+        # Clear CUDA cache after evaluation to free memory
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         
         return metrics
     
