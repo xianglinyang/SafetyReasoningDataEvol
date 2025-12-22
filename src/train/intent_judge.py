@@ -30,11 +30,12 @@ Return a JSON object where keys are the id of the candidate questions. For each,
 - "confidence": A float between 0.0 and 1.0 indicating your certainty.
 
 **Example Output:**
+```json
 {{
   "1": {{"Intent similarity": 0.98, "confidence": 1.0}},
   "2": {{"Intent similarity": 0.3,  "confidence": 0.95}}
 }}
-
+```
 **Your JSON Output:**"""
 
 
@@ -111,9 +112,10 @@ class LLMIntentEvaluator:
         valid_candidates = []
         for question_q, candidate_list, result in tqdm(zip(question_qs, candidate_lists, results)):
             candidates = []
-            for candidate,id, result_dict in zip(candidate_list, range(len(candidate_list)), result.values()):
+            for id, result_dict in result.items():
+                candidate = candidate_list[int(id)-1]
                 if float(result_dict["Intent similarity"]) >= similarity_threshold and float(result_dict["confidence"]) >= confidence_threshold:
-                    candidates.append(candidate_list[int(id)])
+                    candidates.append(candidate)
             valid_candidates.append({
                 question_q: candidates,
             })
