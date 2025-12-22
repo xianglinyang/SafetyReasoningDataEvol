@@ -26,8 +26,9 @@ def select_strategies(harmful_dataset_with_losses, top_ratio=0.1):
     losses_np = np.array(losses)
     topK_idxs = np.argsort(losses_np)[::-1][:int(len(losses_np)*top_ratio)]
     # turn it into a mask
-    mask = np.ones(len(losses_np), dtype=bool)
-    mask[topK_idxs] = False
+    mask = [1 for _ in range(len(losses_np))]
+    for idx in topK_idxs:
+        mask[idx] = 0
 
     # 3. write them back to the dataset
     for data, strategy, loss_diff, idx in zip(harmful_dataset_with_losses, strategies, losses, mask):
