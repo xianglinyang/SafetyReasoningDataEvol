@@ -1,9 +1,9 @@
 #!/bin/bash
 per_gpu_jobs_num=1
 
-gpu_num=2
+gpu_num=1
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(0 1)
+gpu_ids=(0)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -11,7 +11,7 @@ gpu_ids=(0 1)
 gpu_setup="single"
 
 model_name_or_path_list=(
-    # "meta-llama/Llama-3.1-8B-Instruct"
+    "meta-llama/Llama-3.1-8B-Instruct"
     # "mistralai/Mistral-7B-Instruct-v0.2"
 
     # "GraySwanAI/Llama-3-8B-Instruct-RR"
@@ -38,13 +38,16 @@ model_name_or_path_list=(
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
 
-    "thu-ml/STAIR-Llama-3.1-8B-SFT"
-    "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
+    # "thu-ml/STAIR-Llama-3.1-8B-SFT"
+    # "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
+    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251219-165422/checkpoint-933"
+    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-933"
+    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-1244"
 
 )
 dataset_name_list=(
     # "sorrybench"
-    "advbench"
+    # "advbench"
     # "harmbench"
     # "harmbench_attack"
     
@@ -54,9 +57,9 @@ dataset_name_list=(
     # "Stereotype"
     # "CSRT"
 
-    # "wildjailbreak"
-    # "XSafety"
-    # "PolyGuardMix"
+    "wildjailbreak"
+    "XSafety"
+    "PolyGuardMix"
 
 )
 attack_name_list=(
@@ -157,6 +160,8 @@ save_dir_list=(
     # "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/mistral_7b_v2_scot_CR_CoT_ablation/test_cases.json"
     # "/home/ljiahao/xianglin/git_space/HarmBench/test_cases/PAP/mistral_7b_v2_scot_variants_ablation/test_cases.json"
     None
+    # None
+    # None
 )
 
 # prompt_cot_list=(3)
@@ -164,7 +169,7 @@ prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 300"
+--eval_num 800"
 
 # Counter to distribute commands across GPUs
 counter=0
@@ -173,8 +178,8 @@ for save_dir in ${save_dir_list[@]}; do
     for split in ${splits[@]}; do
         for model_name_or_path in ${model_name_or_path_list[@]}; do
             for prompt_cot in ${prompt_cot_list[@]}; do
-            for dataset_name in ${dataset_name_list[@]}; do
-                for attack_name in ${attack_name_list[@]}; do
+                for dataset_name in ${dataset_name_list[@]}; do
+                    for attack_name in ${attack_name_list[@]}; do
                         # Calculate GPU IDs based on setup
                         if [ "$gpu_setup" = "single" ]; then
                             gpu_id=${gpu_ids[$((counter % gpu_num))]}

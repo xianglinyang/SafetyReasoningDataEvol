@@ -3,7 +3,7 @@
 per_gpu_jobs_num=1
 gpu_num=4  # number of GPUs
 jobs_num=$((per_gpu_jobs_num*gpu_num))  # number of jobs to run in parallel, jobs_num = gpu_num*per_gpu_jobs_num
-available_gpu_ids=(0 1 2 3)
+available_gpu_ids=(1)
 
 model_name_or_path_list=(
     # "meta-llama/Llama-3.1-8B-Instruct"
@@ -13,19 +13,6 @@ model_name_or_path_list=(
     # "GraySwanAI/Mistral-7B-Instruct-RR"
 
     # "cais/zephyr_7b_r2d2"
-
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
-
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-225"
-
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
     # "meta-llama/Meta-Llama-3-8B-Instruct"
 
     "meta-llama/Llama-2-13b-chat-hf"
@@ -37,7 +24,9 @@ model_name_or_path_list=(
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
 
     # "thu-ml/STAIR-Llama-3.1-8B-SFT"
-    "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
+    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251219-165422/checkpoint-933"
+    "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-933"
+    "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-1244"
 
 )
 dataset_name_list=(
@@ -58,7 +47,7 @@ header="python -m src.evaluate.evaluate_common_reasoning"
 base_arguments="\
 --torch_type bf16 \
 --split test \
---eval_num 500 \
+--eval_num 200 \
 --device cuda"
 
 # Counter to distribute commands across GPUs
@@ -66,8 +55,6 @@ counter=0
 
 for model_name_or_path in ${model_name_or_path_list[@]}; do
     for dataset_name in ${dataset_name_list[@]}; do
-        # gpu_id=$((counter % gpu_num))
-        # gpu_id=7
         gpu_id=${available_gpu_ids[$((counter % gpu_num))]}
         run_id=$RANDOM
 

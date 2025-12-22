@@ -7,19 +7,20 @@
 - https://github.com/allenai/open-instruct/tree/main
 
 # Run Instructions
-Step 1: Generate Demonstration for evolution (optional)
+
+Step 1: download data from `download_data.ipynb`
+
+Step 2: Generate Demonstration for evolution (optional)
 1. Generate with ```src.evol.diverse_demo.ipynb```
 2. Copy paste the demo to ```src.evol.question_evol_prompt.py```
 
 Step 2: Implement a new demonstration strategy in ```question_evol``` and ```assemble``` (Optional)
 
-Step 3: Download the dataset, evolve the questions, and get completions of dolly answers
-** No need to run this step as we have already downloaded the dataset and processed it **
+Step 3: Evolve the questions
 ```bash
-python -m src.evol.assemble
+bash scripts/evol/data_evol.sh
 ```
-
-Step 4: Filter non refusal answer
+Step 4: Filter non refusal answer or error answers
 
 Step 5: Train model
 ```bash
