@@ -39,12 +39,10 @@ class SafetyReasoningDataset(Dataset):
     
     def __init__(self, 
         dataset: List[Dict],
-        model_name: str,         # 'llama3'
         tokenizer: transformers.PreTrainedTokenizer, 
         max_length: int = 2048,
     ):
         super(SafetyReasoningDataset, self).__init__()
-        self.model_name = model_name
         self.tokenizer = tokenizer
         self.max_length = max_length
         self.dataset = dataset
@@ -89,20 +87,26 @@ class SafetyReasoningDataset(Dataset):
         item = self.dataset[i]
         question = item['question']
         answer = item['answer']
-        mutation = item['mutation'] if 'mutation' in item else None
+        mutation = item.get('selected_mutation', None)
+        data_type = item.get('data_type', 'benign')  # 'benign' or 'harmful'
+        is_adv = True if data_type == 'harmful' and item.get('selected_mutation') is not None else False
+
         normal_inputs = self._format_data(question, answer)
 
         model_inputs = dict(
             input_ids=normal_inputs['input_ids'],
             attention_mask=normal_inputs['attention_mask'],
             labels=normal_inputs['labels'],
+            data_type=data_type,  # 'benign' or 'harmful'
+            is_adv=torch.tensor(1 if is_adv else 0, dtype=torch.long),  # mask for adversarial
         )
-        if mutation is not None:
+        if mutation is not None and is_adv:
             adv_inputs = self._format_data(mutation, answer)
             model_inputs['adv_input_ids'] = adv_inputs['input_ids']
             model_inputs['adv_attention_mask'] = adv_inputs['attention_mask']
             model_inputs['adv_labels'] = adv_inputs['labels']
         else:
+            # No adversarial mutation, use dummy values (will be masked out)
             model_inputs['adv_input_ids'] = normal_inputs['input_ids'].clone()
             model_inputs['adv_attention_mask'] = normal_inputs['attention_mask'].clone()
             model_inputs['adv_labels'] = normal_inputs['labels'].clone()
@@ -114,11 +118,9 @@ if __name__ == "__main__":
     from transformers import AutoTokenizer
     dataset = json.load(open("data/processed/STAIR-SFT_diverse.json", "r"))
 
-
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-8B-Instruct")
     tokenizer.pad_token = tokenizer.eos_token
     train_dataset = SafetyReasoningDataset(
-        model_name="meta-llama/Llama-3.1-8B-Instruct",
         dataset=dataset,
         tokenizer=tokenizer,
         max_length=2048,
