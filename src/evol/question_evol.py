@@ -46,7 +46,7 @@ class QuestionEvol:
 	def _parse_variants_response(self, response, expected_count):
 		'''
 		Parse the JSON response from LLM to extract variants.
-		Expected format: {"variant_1": "...", "variant_2": "...", ...}
+		Expected format: {"variant_1": {"text": "...", "intent_similarity": <float>, "confidence": <float>}, "variant_2": {"text": "...", "intent_similarity": <float>, "confidence": <float>}, ...}
 		
 		Args:
 			response: The LLM response string
@@ -104,7 +104,9 @@ class QuestionEvol:
 			"mutations": [
 				{
 					"strategy": strategy,
-					"text": variant
+					"text": variant["text"],
+					"intent_similarity": float(variant.get("intent_similarity", 0)),
+					"confidence": float(variant.get("confidence", 0))
 				} for strategy, variants in strategy_results.items() for variant in variants
 			]
 		}
@@ -184,7 +186,9 @@ class QuestionEvol:
 				for variant_text in strategy_results[strategy][i]:
 					mutations.append({
 						"strategy": strategy,
-						"text": variant_text
+						"text": variant_text["text"],
+						"intent_similarity": float(variant_text.get("intent_similarity", 0)),
+						"confidence": float(variant_text.get("confidence", 0))
 					})
 			
 			results.append({
@@ -244,17 +248,9 @@ class QuestionEvol:
 		results = {}
 		for instruction, strategy, response in zip(instructions, targeted_strategies, responses):
 			variants = self._parse_variants_response(response, num)
-			
-			# Create mutations list for this instruction
-			mutations = [
-				{
-					"strategy": strategy,
-					"text": variant_text
-				}
-				for variant_text in variants
-			]
-
-			results[instruction] = mutations
+			for variant in variants:
+				variant["strategy"] = strategy
+			results[instruction] = variants
 			
 		return results
 
@@ -294,6 +290,8 @@ async def test_invoke_batch_targeted():
 		print(f"### Total mutations: {len(mutations)}")
 		for mutation in mutations:
 			print(f"  - [{mutation['strategy']}]: {mutation['text']}")
+			print(f"    - intent_similarity: {mutation.get('intent_similarity', None)}")
+			print(f"    - confidence: {mutation.get('confidence', None)}")
 		print("*"*100)
 
 # def main():
