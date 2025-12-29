@@ -166,6 +166,7 @@ class VLLMModel(BaseLLM):
             top_p=top_p,
             max_tokens=max_new_tokens,  # Maximum number of tokens to generate per output. Adjust as needed.
             stop=stop_tokens, # Sequences at which to stop generation.
+            truncate_prompt_tokens=8192,  # Truncate prompts that exceed model's max length
         )
         logger.info(f"Using sampling parameters: {sampling_params}")
 
@@ -192,6 +193,7 @@ class VLLMModel(BaseLLM):
             temperature=temperature,
             top_p=top_p,
             stop=stop_tokens,
+            truncate_prompt_tokens=8192,  # Truncate prompts that exceed model's max length
         )
         logger.info(f"Using sampling parameters: {sampling_params}")
 
