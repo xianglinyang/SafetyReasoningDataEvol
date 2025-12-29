@@ -782,11 +782,7 @@ async def main():
         del llm
         torch.cuda.empty_cache()
 
-<<<<<<< HEAD
-        evaluation = await evaluate_jailbreak(questions, responses, categories, methodologies=["llamaguard3"], eval_device=eval_device)
-=======
         evaluation = evaluate_jailbreak(questions, responses, categories, methodologies=["substring_matching", "llamaguard3"], eval_device=eval_device)
->>>>>>> da79197 (minor)
     except Exception as e:
         logger.error(f"Error during evaluation: {e}")
         raise
