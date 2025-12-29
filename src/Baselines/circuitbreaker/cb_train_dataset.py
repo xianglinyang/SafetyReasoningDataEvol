@@ -43,6 +43,7 @@ def data_reader(dataset_name: str):
 
         with open("data/processed/circuitbreaker_train.json") as file:
             dataset = json.load(file)
+        dataset = dataset[:2000]
         borderline_orig_s = []
         for d in dataset:
             prompt = d['prompt']
