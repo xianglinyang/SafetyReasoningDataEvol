@@ -19,7 +19,7 @@ class CircuitBreakerTrainer(Trainer):
         self.lorra_target_layers = lorra_target_layers
 
     def get_training_progress(self):
-        return self.current_training_step / 300
+        return self.current_training_step / (self.num_training_steps + 1)
     
     def compute_loss(self, model, inputs, return_outputs=False):
 
