@@ -23,7 +23,6 @@ from transformers.integrations import deepspeed
 import torch
 import torch.distributed as dist
 import numpy as np
-import atexit
 import logging
 
 logger = logging.getLogger(__name__)
@@ -94,7 +93,6 @@ def main():
     )
     tokenizer.pad_token = tokenizer.eos_token or tokenizer.unk_token
     extra_save_kargs = dict(tokenizer=tokenizer)
-    save_model_function = save_model_and_tokenizer
     
     # Build model loading arguments
     # model_name_or_path should be passed as first positional argument, not as keyword
@@ -107,7 +105,9 @@ def main():
         model_load_kwargs["device_map"] = device_map
     
     model = AutoModelForCausalLM.from_pretrained(model_name_or_path, **model_load_kwargs)
-    save_model_function = partial(save_model_function, 
+    
+    # Create partial function for saving model
+    save_model_function = partial(save_model_and_tokenizer, 
                     model_name_or_path=model_name_or_path, 
                     drop_layers_after=drop_layers_after, 
                     output_dir=training_args.output_dir,
@@ -127,10 +127,15 @@ def main():
 
     ultrachat_dataset = data_reader("ultrachat")
     xstest_dataset = data_reader("xstest")
+    if training_args.use_refusal_retain:
+        retain_dataset = data_reader("circuitbreaker-train-retain")
+        retain_dataset = retain_dataset + xstest_dataset + ultrachat_dataset
+    else: 
+        retain_dataset = ultrachat_dataset + xstest_dataset
+
     circuitbreaker_train_cb_dataset = data_reader("circuitbreaker-train-cb")
     circuitbreaker_val_dataset = data_reader("circuitbreaker-val")
 
-    retain_dataset = ultrachat_dataset + xstest_dataset
     refusal_dataset = circuitbreaker_train_cb_dataset
     val_dataset = circuitbreaker_val_dataset
 
@@ -155,12 +160,18 @@ def main():
     )
     model.config.use_cache = False
     
-    # Only register atexit handler on rank 0 to avoid conflicts in distributed training
-    if training_args.local_rank == -1 or training_args.local_rank == 0:
-        atexit.register(save_model_function, model=model, trainer=trainer)
-    
+    # Train the model
     try:
-        trainer.train()
+        logger.info("*** Starting training ***")
+        train_result = trainer.train()
+        logger.info("*** Training completed successfully ***")
+        
+        # Save model manually after training completes (only on rank 0)
+        if training_args.local_rank == -1 or training_args.local_rank == 0:
+            logger.info(f"*** Saving model to {training_args.output_dir} ***")
+            save_model_function(model=model, trainer=trainer)
+            logger.info("*** Model saved successfully ***")
+            
     finally:
         # Cleanup distributed training
         if dist.is_initialized():
