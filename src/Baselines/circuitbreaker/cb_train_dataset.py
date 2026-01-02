@@ -41,7 +41,7 @@ def data_reader(dataset_name: str):
     
     elif dataset_name == "circuitbreaker-train-retain":
 
-        with open("data/processed/circuitbreaker_train.json") as file:
+        with open("data/raw/circuit_breakers_train.json") as file:
             dataset = json.load(file)
         dataset = dataset[:2000]
         borderline_orig_s = []
@@ -56,7 +56,7 @@ def data_reader(dataset_name: str):
         return borderline_orig_s
     
     elif dataset_name == "circuitbreaker-train-cb":
-        with open("data/processed/circuitbreaker_train.json") as file:
+        with open("data/raw/circuit_breakers_train.json") as file:
             dataset = json.load(file)
         res = []
         for d in dataset:
@@ -69,7 +69,7 @@ def data_reader(dataset_name: str):
             res.append(messages)
         return res
     elif dataset_name == "circuitbreaker-val":
-        with open("data/processed/circuitbreaker_val.json") as file:
+        with open("data/raw/circuit_breakers_val.json") as file:
             dataset = json.load(file)
         res = []
         for d in dataset:
