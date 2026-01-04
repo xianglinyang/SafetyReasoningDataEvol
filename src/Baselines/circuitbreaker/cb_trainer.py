@@ -19,7 +19,8 @@ class CircuitBreakerTrainer(Trainer):
         self.lorra_target_layers = lorra_target_layers
 
     def get_training_progress(self):
-        return self.current_training_step / (self.num_training_steps + 1)
+        # Match original circuit-breakers implementation which hardcodes 300
+        return self.current_training_step / 300
     
     def compute_loss(self, model, inputs, return_outputs=False):
 
@@ -202,7 +203,7 @@ def data_collator(batch_list):
     
     for k, inputs in batch_inputs.items():
         if isinstance(inputs[0], torch.Tensor):
-            # Stack tensors to create batch dimension instead of concatenating
+            # Use stack to create batch dimension from 1D tensors
             batch_inputs[k] = torch.stack(inputs, dim=0)
         elif isinstance(inputs[0], int):
             batch_inputs[k] = torch.tensor(inputs)

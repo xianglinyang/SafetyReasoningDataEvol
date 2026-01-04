@@ -125,16 +125,17 @@ def main():
     if training_args.gradient_checkpointing:
         model.enable_input_require_grads()
 
-    ultrachat_dataset = data_reader("ultrachat")
-    xstest_dataset = data_reader("xstest")
+    prob = 0.5 if "meta-llama/Meta-Llama-3-8B-Instruct" in model_name_or_path else 1.0
+    ultrachat_dataset = data_reader("ultrachat", prob)
+    xstest_dataset = data_reader("xstest", prob)
     if training_args.use_refusal_retain:
-        retain_dataset = data_reader("circuitbreaker-train-retain")
+        retain_dataset = data_reader("circuitbreaker-train-retain", prob)
         retain_dataset = retain_dataset + xstest_dataset + ultrachat_dataset
     else: 
         retain_dataset = ultrachat_dataset + xstest_dataset
-
-    circuitbreaker_train_cb_dataset = data_reader("circuitbreaker-train-cb")
-    circuitbreaker_val_dataset = data_reader("circuitbreaker-val")
+    
+    circuitbreaker_train_cb_dataset = data_reader("circuitbreaker-train-cb", prob)
+    circuitbreaker_val_dataset = data_reader("circuitbreaker-val", prob)
 
     refusal_dataset = circuitbreaker_train_cb_dataset
     val_dataset = circuitbreaker_val_dataset
