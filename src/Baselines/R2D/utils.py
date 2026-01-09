@@ -83,23 +83,26 @@ def merge_lora_checkpoint(base_model_path: str, output_path: str, device: str = 
         lora_adapter_path = os.path.join(output_path, checkpoint_dir, "adapter_model")
         logger.info(f"Loading PEFT adapter from: {lora_adapter_path}")
 
-        # --- Save Tokenizer ---
-        # Usually the tokenizer is saved alongside the adapter, find its path
-        # Assuming tokenizer was saved one level up from adapter_model dir
+        # --- Load Tokenizer ---
+        # Try to load tokenizer from checkpoint, fallback to base model
         tokenizer_path = os.path.join(output_path, checkpoint_dir, "tokenizer")
-
+        
         if os.path.exists(tokenizer_path):
             logger.info(f"Loading tokenizer from: {tokenizer_path}")
             tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
-            logger.info(f"Saving tokenizer to: {merged_output_path}")
-            tokenizer.save_pretrained(merged_output_path, safe_serialization=True)
-            logger.info("Tokenizer saved.")
         else:
-            logger.warning(f"Warning: Tokenizer not found at expected path: {tokenizer_path}. You may need to save it manually.")
+            logger.warning(f"Warning: Tokenizer not found at {tokenizer_path}. Loading from base model instead.")
+            tokenizer = AutoTokenizer.from_pretrained(base_model_path)
         
+        # Set pad token if needed
         if tokenizer.pad_token is None:
             logger.info("Adding special pad token to tokenizer.")
             tokenizer.add_special_tokens({"pad_token": "<pad>"})
+        
+        # Save tokenizer to merged output path
+        logger.info(f"Saving tokenizer to: {merged_output_path}")
+        tokenizer.save_pretrained(merged_output_path, safe_serialization=True)
+        logger.info("Tokenizer saved.")
 
         logger.info(f"Loading base model from: {base_model_path}")
         # --- Load FRESH Base Model for THIS Checkpoint ---

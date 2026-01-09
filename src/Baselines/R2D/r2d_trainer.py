@@ -69,11 +69,13 @@ class R2DTrainer(Trainer):
             logging.error(f"Error saving PEFT adapter model: {e}")
 
         # Save Tokenizer (often needed with the model)
-        if self.tokenizer is not None:
+        # Use processing_class (new API) or tokenizer (old API) for compatibility
+        tokenizer = getattr(self, 'processing_class', None) or getattr(self, 'tokenizer', None)
+        if tokenizer is not None:
             tokenizer_save_path = os.path.join(output_dir, "tokenizer")
             try:
                 logging.info(f"Saving tokenizer to {tokenizer_save_path}...")
-                self.tokenizer.save_pretrained(tokenizer_save_path)
+                tokenizer.save_pretrained(tokenizer_save_path)
                 logging.info("Tokenizer saved successfully.")
             except Exception as e:
                 logging.error(f"Error saving tokenizer: {e}")

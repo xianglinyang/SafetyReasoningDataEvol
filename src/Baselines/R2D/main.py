@@ -101,16 +101,20 @@ def main():
         model=llm,
         args=training_args,
         train_dataset=train_dataset,
+        tokenizer=tokenizer,  # Pass tokenizer to enable checkpoint saving
         data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer)
     )
     trainer.train()
 
-    # Stage 3: Save the model and tokenizer
-
-    # save to output_dir
+    # Stage 3: Save the final model and tokenizer
+    logger.info("*** Saving final model and tokenizer ***")
     save_tokenizer_and_model(llm, tokenizer, training_args)
 
-    # Cleanup distributed training
+    # Stage 4: Merge LoRA checkpoints (before cleanup for better debugging)
+    logger.info("Starting checkpoint merge...")
+    merge_lora_checkpoint(model_args.model_name_or_path, training_args.output_dir)
+
+    # Stage 5: Cleanup distributed training
     if dist.is_initialized():
         dist.destroy_process_group()
 
@@ -123,10 +127,7 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     
-    logger.info("Memory released (GPU and CPU). Starting checkpoint merge...")
-    
-    # merge lora checkpoint and save the merged models
-    merge_lora_checkpoint(model_args.model_name_or_path, training_args.output_dir)
+    logger.info("All done! Memory released (GPU and CPU).")
 
 if __name__ == "__main__":
     main()
