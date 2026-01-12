@@ -73,15 +73,17 @@ async def mutate_dataset(dataset_name, llm_name, num_variants=18, alpha=0.5, dem
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset_name", type=str)
-    parser.add_argument("--llm_name", type=str, default="openai/gpt-4o-mini")
-    parser.add_argument("--num", type=int, default=18)
+    parser.add_argument("--llm_name", type=str)
+    parser.add_argument('-n', "--num_variants", type=int)
+    parser.add_argument("--alpha", type=float)
     parser.add_argument("--demo_selected_strategy", type=str, default="diverse")
     parser.add_argument("--run_id", '-r', type=int)
     
     args = parser.parse_args()
     dataset_name = args.dataset_name
     llm_name = args.llm_name
-    num = args.num
+    num_variants = args.num_variants
+    alpha = args.alpha
     demo_selected_strategy = args.demo_selected_strategy
     run_id = args.run_id
 
@@ -89,7 +91,7 @@ async def main():
     logger.info("Assembling data...")
 
     logger.info(f"Mutating {dataset_name} dataset...")
-    await mutate_dataset(dataset_name, llm_name, num, demo_selected_strategy)
+    await mutate_dataset(dataset_name, llm_name, num_variants, alpha, demo_selected_strategy)
     
 if __name__ == "__main__":    
     asyncio.run(main())

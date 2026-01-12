@@ -85,7 +85,7 @@ class QuestionEvol:
 			logger.error(f"Error parsing variants response: {e}. Response: {response[:100]}...")
 			return []
 	
-	def generate_prompt_variants(self, instruction, llm_client: BaseLLM, num=8, demo_selected_strategy="diverse"):
+	def generate_prompt_variants(self, instruction, llm_client: BaseLLM, num=8, alpha=0.5, demo_selected_strategy="diverse"):
 		'''
 		Generate num variants for an instruction, distributed across all 6 strategies.
 		'''
@@ -95,7 +95,7 @@ class QuestionEvol:
 		for strategy, count in zip(self._strategies, strategy_counts):
 			if count == 0:
 				continue
-			prompt = self.create_variants_prompt(strategy=strategy, instruction=instruction, num=count, demo_selected_strategy=demo_selected_strategy)
+			prompt = self.create_variants_prompt(strategy=strategy, instruction=instruction, num=count, alpha=alpha, demo_selected_strategy=demo_selected_strategy)
 			response = llm_client.invoke(prompt)
 			variants = self._parse_variants_response(response, count)
 			strategy_results[strategy] = variants
@@ -111,7 +111,7 @@ class QuestionEvol:
 			]
 		}
 		
-	async def generate_prompt_variants_batch(self, instructions, llm_client: BaseLLM, num=16, demo_selected_strategy="diverse"):
+	async def generate_prompt_variants_batch(self, instructions, llm_client: BaseLLM, num=16, alpha=0.5, demo_selected_strategy="diverse"):
 		'''
 		Generate num variants for each instruction, distributed across all 6 strategies.
 		
@@ -161,6 +161,7 @@ class QuestionEvol:
 					strategy=strategy,
 					instruction=instruction,
 					num=count,  # Ask for 'count' variants
+					alpha=alpha,
 					demo_selected_strategy=demo_selected_strategy
 				)
 				prompts.append(prompt)
