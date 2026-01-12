@@ -91,29 +91,41 @@ class HuggingFaceModel(BaseLLM):
 
 # vllm models
 class VLLMModel(BaseLLM):
-    def __init__(self, model_name_or_path: str, device: str = "cuda", torch_dtype: torch.dtype = torch.bfloat16, tensor_parallel_size: int = 1, gpu_memory_utilization: float = 0.95):
+    def __init__(self, model_name_or_path: str, device: str = "cuda", torch_dtype: torch.dtype = torch.bfloat16, tensor_parallel_size: int = 1, gpu_memory_utilization: float = 0.95, max_model_len: int = 8192):
         '''
         Args:
             model_name: str, the name of the model
             device: str, the device to use
             torch_dtype: torch.dtype, the dtype to use
             tensor_parallel_size: int, the number of GPUs to use
+            gpu_memory_utilization: float, the GPU memory utilization
+            max_model_len: int, maximum model context length (default: None, use model's default)
         '''
         super().__init__(model_name_or_path)
         self.device = device
         self.torch_dtype = torch_dtype
         self.tensor_parallel_size = tensor_parallel_size
         self.gpu_memory_utilization = gpu_memory_utilization
+        self.max_model_len = max_model_len
         
         logger.info(f"Initializing LLM with model: {model_name_or_path}...")
         time_start = time.time()
-        self.llm = LLM(
-            model=model_name_or_path,
-            tensor_parallel_size=tensor_parallel_size,
-            gpu_memory_utilization=gpu_memory_utilization,
-            trust_remote_code=True, #  Needed for some models like Mistral, already default in recent vLLM
-            dtype=self.torch_dtype, # or "bfloat16" if supported and desired. "auto" by default.
-        )
+        
+        # Build LLM kwargs
+        llm_kwargs = {
+            "model": model_name_or_path,
+            "tensor_parallel_size": tensor_parallel_size,
+            "gpu_memory_utilization": gpu_memory_utilization,
+            "trust_remote_code": True,
+            "dtype": self.torch_dtype,
+        }
+        
+        # Add max_model_len if specified
+        if max_model_len is not None:
+            llm_kwargs["max_model_len"] = max_model_len
+            logger.info(f"Setting max_model_len to {max_model_len}")
+        
+        self.llm = LLM(**llm_kwargs)
         time_end = time.time()
         logger.info(f"LLM initialization took {time_end - time_start:.2f} seconds.")
     
@@ -187,15 +199,22 @@ class VLLMModel(BaseLLM):
     
     def batch_invoke(self, prompts: List[str], n: int = 1, temperature: float = 0.7, top_p: float = 0.95, max_new_tokens: int = 1024, return_latency: bool = False) -> str:
         stop_tokens = get_stop_tokens(self.model_name)
+        # Get max_model_len from the LLM config
+        max_model_len = getattr(self.llm.llm_engine.model_config, 'max_model_len', 8192)
+        
+        # Calculate safe truncation length: leave room for output tokens
+        safe_truncate_len = max_model_len - max_new_tokens - 10  # -10 as safety buffer
+        
         sampling_params = SamplingParams(
             n=n,  # Number of output sequences to return for each prompt
             max_tokens=max_new_tokens,
             temperature=temperature,
             top_p=top_p,
             stop=stop_tokens,
-            truncate_prompt_tokens=8192,  # Truncate prompts that exceed model's max length
+            truncate_prompt_tokens=safe_truncate_len,  # Truncate to leave room for output
         )
         logger.info(f"Using sampling parameters: {sampling_params}")
+        logger.info(f"Max model length: {max_model_len}, Safe truncate length: {safe_truncate_len}")
 
         logger.info("\nGenerating responses...")
         # vLLM can process a list of prompts in a batch very efficiently.
