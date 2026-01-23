@@ -13,8 +13,7 @@ Step 1: download data from `download_data.ipynb`
 Step 2: Generate Demonstration for evolution (optional)
 1. Generate with ```src.evol.diverse_demo.ipynb```
 2. Copy paste the demo to ```src.evol.question_evol_prompt.py```
-
-Step 2: Implement a new demonstration strategy in ```question_evol``` and ```assemble``` (Optional)
+3. Implement a new demonstration strategy in ```question_evol``` and ```assemble```
 
 Step 3: Evolve the questions
 ```bash
