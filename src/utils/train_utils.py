@@ -21,7 +21,7 @@ def load_tokenizer_and_model(model_args):
     # Load model. Apply LoRA if needed
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path, 
-        torch_dtype=str2dtype(model_args.torch_dtype),
+        dtype=str2dtype(model_args.torch_dtype),
         device_map=model_args.device_map
     )
 
