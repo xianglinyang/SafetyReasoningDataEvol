@@ -50,6 +50,12 @@ class DataArguments:
             "help": "The ratio of the mutations to select"
         }
     )
+    probe_results_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Path to the probe results JSON file (used by run_train.py)"
+        }
+    )
 
 @dataclass
 class ModelArguments:
@@ -246,6 +252,18 @@ class TrainingArguments(TrainingArguments):
         default=None,
         metadata={
             "help": "The directory to store the dataset logs."
+        },
+    )
+    probe_epoch: Optional[int] = field(
+        default=0,
+        metadata={
+            "help": "The current epoch number (used for probe result naming)"
+        },
+    )
+    merge_lora_after_training: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "Whether to merge LoRA adapter after training completes"
         },
     )
 
