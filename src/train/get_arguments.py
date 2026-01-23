@@ -145,6 +145,13 @@ class ModelArguments:
     lora_dropout: Optional[float]=field(default=0.1, metadata={"help": ("dropout for lora")})
     lora_target_modules: List[str]=field(
         default_factory=list, metadata={"help": ("target modules for lora")})
+    base_model_path: Optional[str] = field(
+        default=None,
+        metadata={
+            "help": "Base model path (required when loading from checkpoint with LoRA adapter). "
+                    "If not specified, will use model_name_or_path as base model."
+        }
+    )
 
 
 fsdp_config = {

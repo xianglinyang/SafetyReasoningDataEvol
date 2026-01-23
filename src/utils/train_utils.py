@@ -9,18 +9,45 @@ from src.utils.dtype_utils import str2dtype
 logger = logging.getLogger(__name__)
 
 def load_tokenizer_and_model(model_args):
+    # Check if loading from a checkpoint with LoRA adapter
+    adapter_path = os.path.join(model_args.model_name_or_path, "adapter_model")
+    tokenizer_path = os.path.join(model_args.model_name_or_path, "tokenizer")
+    is_checkpoint = os.path.isdir(adapter_path)
+    
+    # Determine paths for tokenizer and base model
+    if is_checkpoint:
+        # Loading from checkpoint
+        logger.info(f"Detected checkpoint structure at {model_args.model_name_or_path}")
+        logger.info(f"Loading tokenizer from: {tokenizer_path}")
+        logger.info(f"Loading adapter from: {adapter_path}")
+        
+        # Use base_model_path if provided, otherwise error
+        if model_args.base_model_path is None:
+            raise ValueError(
+                "When loading from checkpoint, base_model_path must be specified. "
+                f"Checkpoint path: {model_args.model_name_or_path}"
+            )
+        
+        base_model_path = model_args.base_model_path
+        tokenizer_load_path = tokenizer_path if os.path.isdir(tokenizer_path) else base_model_path
+    else:
+        # Loading from regular model path
+        base_model_path = model_args.model_name_or_path
+        tokenizer_load_path = model_args.model_name_or_path
+    
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
-        model_args.model_name_or_path,
+        tokenizer_load_path,
         use_fast=model_args.use_fast_tokenizer,
         padding_side="right"
     )
     if tokenizer.pad_token is None:
         tokenizer.add_special_tokens({"pad_token": "<pad>"})
 
-    # Load model. Apply LoRA if needed
+    # Load base model
+    logger.info(f"Loading base model from: {base_model_path}")
     model = AutoModelForCausalLM.from_pretrained(
-        model_args.model_name_or_path, 
+        base_model_path, 
         dtype=str2dtype(model_args.torch_dtype),
         device_map=model_args.device_map
     )
@@ -34,7 +61,27 @@ def load_tokenizer_and_model(model_args):
             model.get_input_embeddings().weight.requires_grad = False
             model.get_output_embeddings().weight.requires_grad = False
 
-    if not isinstance(model, PeftModel) and model_args.lora:
+    # Load or create LoRA adapter
+    if is_checkpoint:
+        # Load existing LoRA adapter from checkpoint
+        logger.info(f"Loading LoRA adapter from checkpoint: {adapter_path}")
+        model = PeftModel.from_pretrained(
+            model,
+            adapter_path,
+            is_trainable=True,
+        )
+        logger.info("LoRA adapter loaded from checkpoint.")
+        model.print_trainable_parameters()
+        
+        # for checkpointing
+        if hasattr(model, "enable_input_require_grads"):
+            model.enable_input_require_grads()
+        else:
+            def make_inputs_require_grad(module, input, output):
+                output.requires_grad_(True)
+            model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
+    elif not isinstance(model, PeftModel) and model_args.lora:
+        # Create new LoRA adapter
         lora_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
             inference_mode=False,
@@ -44,9 +91,7 @@ def load_tokenizer_and_model(model_args):
             target_modules=model_args.lora_target_modules,
         )
         model = get_peft_model(model, lora_config)
-        logger.info(
-            f"Applied LoRA to model."
-        )
+        logger.info("Applied LoRA to model.")
         model.print_trainable_parameters()
 
         # for checkpointing
