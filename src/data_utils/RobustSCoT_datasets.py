@@ -7,11 +7,12 @@ from dataclasses import dataclass
 import torch
 import transformers
 from torch.utils.data import Dataset
-import numpy as np
+import csv
+from datasets import load_dataset
 
 DATA_DIR = "data/processed"
 
-def load_dataset(dataset_name: str):
+def data_reader(dataset_name: str):
     if dataset_name == "STAIR-SFT_diverse":
         data_path = os.path.join(DATA_DIR, f'STAIR-SFT_diverse.json')
         with open(data_path, 'r') as f:
@@ -20,17 +21,78 @@ def load_dataset(dataset_name: str):
         new_harmful_dataset = []
         for data in dataset:
             if data['source'] == 'PKU-SafeRLHF':
-                new_harmful_dataset.append({
-                    "question": data['instruction'],
-                    "answer": data['cot'] + "\n" + data['answer'],
-                    "mutations": data['mutations']
-                })
+                if len(data['mutations']) > 0:
+                    new_harmful_dataset.append({
+                        "question": data['instruction'],
+                        "answer": data['cot'] + "\n" + data['answer'],
+                        "mutations": data['mutations']
+                    })
             else:
                 new_benign_dataset.append({
                     "question": data['instruction'],
                     "answer": data['cot'] + "\n" + data['answer'],
                 })
         return new_benign_dataset, new_harmful_dataset
+    elif dataset_name == "circuitbreaker_diverse":
+        new_benign_dataset = []
+        new_harmful_dataset = []
+
+        # retain dataset
+        ds = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft")
+        for example in ds:
+            messages = example["messages"]
+            if len(messages) < 2: 
+                continue
+            else:
+                instruction = messages[0]['content']
+                response = messages[1]['content']
+                new_benign_dataset.append({
+                    "question": instruction,
+                    "answer": response,
+                })
+            if len(new_benign_dataset) >= 2000:
+                break
+    
+        with open(f'data/processed/xstest_v2_completions_gpt4_gpteval.csv', newline='') as f:
+            data = [dict(row) for row in csv.DictReader(f)]
+            data = [row for row in data if row['final_label'] == "1_full_compliance"]
+        
+        for i, d in enumerate(data * 50):
+            prompt = d['prompt']
+            completion = d['completion']
+            new_benign_dataset.append({
+                "question": prompt,
+                "answer": completion,
+            })
+
+        with open(os.path.join(DATA_DIR, f'circuit_breakers_train_diverse.json')) as file:
+            dataset = json.load(file)
+        random.shuffle(dataset)
+        dataset = dataset[:2000]
+        for i, d in enumerate(dataset * 2):
+            prompt = d['prompt']
+            completion = d['llama3_output']
+            new_benign_dataset.append({
+                "question": prompt,
+                "answer": completion,
+            })
+        
+        # refusal part
+        with open(os.path.join(DATA_DIR, f'circuit_breakers_train_diverse.json')) as file:
+            dataset = json.load(file)
+        for d in dataset:
+            prompt = d['prompt']
+            completion = d['output']
+            mutations = d.get('mutations', [])
+            if len(mutations) > 0:
+                new_harmful_dataset.append({
+                    "question": prompt,
+                    "answer": completion,
+                    "mutations": d.get('mutations', [])  # Use .get() to provide default empty list
+                })
+        
+        return new_benign_dataset, new_harmful_dataset
+
     else:
         raise ValueError(f"Dataset {dataset_name} not found")
 
