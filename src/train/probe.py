@@ -7,6 +7,10 @@ from typing import List, Tuple, Dict, Any
 import torch
 from vllm import LLM, SamplingParams
 import numpy as np
+import argparse
+from transformers import AutoTokenizer
+import json
+
 
 def build_prompts_and_prefix_lens(
     tokenizer,
@@ -44,13 +48,22 @@ def build_prompts_and_prefix_lens(
 
 
 def vllm_mean_nll_on_answer_span(
-    llm: LLM,
+    llm,  # Can be LLM instance or model path string
     tokenizer,
     questions: List[str],
     answers: List[str],
     k_ans_tokens: int = 64,
-    chunk_size: int = 2048,   # 一次喂给 vLLM 的样本数（vLLM 会自己再动态 batching）
 ) -> torch.Tensor:
+    # If llm is a string (model path), create LLM instance
+    # Otherwise assume it's already an LLM instance
+    llm_instance = LLM(
+        model=llm,
+        dtype="bfloat16",
+        gpu_memory_utilization=0.7,
+        max_model_len=1024,
+        tensor_parallel_size=1,  # Use only 1 GPU
+    )
+    
     prompts, prefix_lens = build_prompts_and_prefix_lens(
         tokenizer, questions, answers, k_ans_tokens=k_ans_tokens
     )
@@ -69,41 +82,33 @@ def vllm_mean_nll_on_answer_span(
             return float(x.logprob)
         return float(x)
 
-    idx = 0
-    while idx < len(prompts):
-        batch_prompts = prompts[idx: idx + chunk_size]
-        batch_prefix = prefix_lens[idx: idx + chunk_size]
+    req_outs = llm_instance.generate(prompts, sp)
 
-        req_outs = llm.generate(batch_prompts, sp)
+    for j, ro in enumerate(req_outs):
+        plps = ro.prompt_logprobs
+        pre = prefix_lens[j]
 
-        for j, ro in enumerate(req_outs):
-            # ro.prompt_logprobs: list，长度=prompt tokens；每个元素通常是 dict{token_id: Logprob} 或 None
-            plps = ro.prompt_logprobs
-            pre = batch_prefix[j]
-
-            # 只累计 answer span 的 logprob（从 prefix_len 开始到末尾）
-            s = 0.0
-            c = 0
-            for t in range(pre, len(plps)):
-                item = plps[t]
-                if item is None:
+        # 只累计 answer span 的 logprob（从 prefix_len 开始到末尾）
+        s = 0.0
+        c = 0
+        for t in range(pre, len(plps)):
+            item = plps[t]
+            if item is None:
+                continue
+            # item 常见是 dict: {token_id: Logprob}
+            if isinstance(item, dict) and len(item) > 0:
+                v = next(iter(item.values()))
+                lp = _get_logprob(v)
+            else:
+                # 有些版本可能直接给 float / list
+                try:
+                    lp = _get_logprob(item)
+                except Exception:
                     continue
-                # item 常见是 dict: {token_id: Logprob}
-                if isinstance(item, dict) and len(item) > 0:
-                    v = next(iter(item.values()))
-                    lp = _get_logprob(v)
-                else:
-                    # 有些版本可能直接给 float / list
-                    try:
-                        lp = _get_logprob(item)
-                    except Exception:
-                        continue
-                s += (-lp)
-                c += 1
+            s += (-lp)
+            c += 1
 
-            out[idx + j] = (s / max(c, 1))
-
-        idx += chunk_size
+        out[j] = (s / max(c, 1))
 
     return out
 
@@ -112,7 +117,6 @@ def probe_operator_gradient_direction(
     tokenizer, 
     dataset: List[Dict[str, Any]],
     k_ans_tokens: int = 64,
-    chunk_size: int = 2048,
 ):
     """
     Given a dataset, calculate the direction of steepest loss ascent for each mutation strategy. Each strategy might have multiple mutations.
@@ -175,17 +179,8 @@ def probe_operator_gradient_direction(
     all_texts = original_questions + mutation_texts
     all_answers = original_answers + mutation_answers
 
-    
-    # Step 2: Calculate losses for all mutations
-    llm = LLM(
-        model=model_name_or_path,
-        dtype="bfloat16",
-        gpu_memory_utilization=0.9,
-        max_model_len=1024, 
-    )
-
     all_losses = vllm_mean_nll_on_answer_span(
-        llm, tokenizer, all_texts, all_answers, k_ans_tokens=k_ans_tokens, chunk_size=chunk_size)
+        model_name_or_path, tokenizer, all_texts, all_answers, k_ans_tokens=k_ans_tokens)
 
     original_losses = all_losses[:len(original_questions)]
     mutation_losses  = all_losses[len(original_questions):]
@@ -224,65 +219,101 @@ def probe_operator_gradient_direction(
     return results
 
 
-if __name__ == "__main__":
+def main():
+    
+    parser = argparse.ArgumentParser(description="Probe operator gradient direction using vLLM")
+    parser.add_argument("--model_name_or_path", type=str, required=True,
+                        help="Path to the model or HuggingFace model name")
+    parser.add_argument("--dataset_name", type=str, required=True,
+                        help="Dataset name to load")
+    parser.add_argument("--output_path", type=str, required=True,
+                        help="Path to save probe results (JSON)")
+    parser.add_argument("--k_ans_tokens", type=int, default=64,
+                        help="Number of answer tokens to consider")
+    parser.add_argument("--max_samples", type=int, default=None,
+                        help="Maximum number of samples to process (for testing)")
+    parser.add_argument("--gpu_memory_utilization", type=float, default=0.9,
+                        help="GPU memory utilization for vLLM")
+    parser.add_argument("--max_model_len", type=int, default=1024,
+                        help="Maximum model length for vLLM")
+    parser.add_argument("--tensor_parallel_size", type=int, default=1,
+                        help="Number of GPUs to use for tensor parallelism")
+    
+    args = parser.parse_args()
+    
+    # Load tokenizer
+    print(f"Loading tokenizer from {args.model_name_or_path}...")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    
+    # Load dataset
+    print(f"Loading dataset {args.dataset_name}...")
     from src.data_utils.RobustSCoT_datasets import data_reader
-    from transformers import AutoTokenizer
-    import time
-
-    model_name_or_path = "meta-llama/Meta-Llama-3-8B-Instruct"
-    tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-
-    dataset_name = "circuitbreaker_diverse"
-    _, dataset = data_reader(dataset_name)
-
-    dataset = dataset[:500]
-
-    t1 = time.time()
-
+    _, dataset = data_reader(args.dataset_name)
+    
+    if args.max_samples is not None:
+        dataset = dataset[:args.max_samples]
+        print(f"Using first {args.max_samples} samples for testing")
+    
+    # Initialize vLLM
+    print(f"Initializing vLLM with {args.model_name_or_path}...")
+    llm = LLM(
+        model=args.model_name_or_path,
+        dtype="bfloat16",
+        gpu_memory_utilization=args.gpu_memory_utilization,
+        max_model_len=args.max_model_len,
+        tensor_parallel_size=args.tensor_parallel_size,
+    )
+    
+    # Run probe
+    print("Starting probe...")
     results = probe_operator_gradient_direction(
-        model_name_or_path,
-        tokenizer,
-        dataset,
-        k_ans_tokens=64,
-        chunk_size=2048,
-     )
-    t2 = time.time()
-    for result in results:
-        for strategy, loss in result['probe_results'].items():
-            print(f"{strategy}: {loss}")
-        print("-"*100)
+        args.model_name_or_path, tokenizer, dataset, k_ans_tokens=args.k_ans_tokens
+    )
     
-    from src.train.targeted_generation import select_strategies
-    new_dataset = select_strategies(results, top_ratio=0.1)
-
-    for data in new_dataset:
-        print(data['selected_strategy'])
-        print(data['is_mask'])
-        print("-"*100)
+    # Save results
+    print(f"Saving results to {args.output_path}...")
+    with open(args.output_path, 'w', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
     
-    print(f"Time taken: {t2 - t1} seconds for 500 samples")
+    print(f"✓ Probe completed! Results saved to {args.output_path}")
+    print(f"  Total samples: {len(results)}")
+    
+    # Print some statistics
+    avg_loss = np.mean([r['original_loss'] for r in results])
+    print(f"  Average original loss: {avg_loss:.4f}")
+    
+    all_strategies = set()
+    for r in results:
+        all_strategies.update(r['probe_results'].keys())
+    print(f"  Unique strategies found: {len(all_strategies)}")
+    print(f"  Strategies: {', '.join(sorted(all_strategies))}")
 
+
+if __name__ == "__main__":
+    main()
 
 
 # if __name__ == "__main__":
 #     from src.data_utils.RobustSCoT_datasets import data_reader
-#     from transformers import AutoTokenizer, AutoModelForCausalLM
+#     from transformers import AutoTokenizer
+#     import time
 
-#     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
-#     model = AutoModelForCausalLM.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct", torch_dtype=torch.bfloat16)
+#     model_name_or_path = "meta-llama/Meta-Llama-3-8B-Instruct"
+#     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
 #     dataset_name = "circuitbreaker_diverse"
 #     _, dataset = data_reader(dataset_name)
-#     dataset = dataset[:200]
+
+
+#     t1 = time.time()
 
 #     results = probe_operator_gradient_direction(
-#         model,
+#         model_name_or_path,
 #         tokenizer,
 #         dataset,
-#         batch_size=32,
-#         max_length=1024,
-#         device="cuda:0",
+#         k_ans_tokens=64,
 #      )
+#     t2 = time.time()
 #     for result in results:
 #         for strategy, loss in result['probe_results'].items():
 #             print(f"{strategy}: {loss}")
@@ -295,5 +326,11 @@ if __name__ == "__main__":
 #         print(data['selected_strategy'])
 #         print(data['is_mask'])
 #         print("-"*100)
+    
+#     print(f"Time taken: {t2 - t1} seconds for 500 samples")
+
+
+
+
     
     
