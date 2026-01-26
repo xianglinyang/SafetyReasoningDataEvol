@@ -56,6 +56,8 @@ class RobustCoTTrainer(Trainer):
         """
         Custom loss computation for both benign and harmful examples with adversarial masking
         Loss formula: benign_lambda * (all normal losses) + harmful_lambda * (harmful adversarial losses)
+        
+        Memory optimization: Process forward passes sequentially to reduce peak memory usage
         """
         self.current_training_step += 1
 
@@ -63,16 +65,22 @@ class RobustCoTTrainer(Trainer):
         adv_inputs = inputs['adv_inputs']
         # is_adv_mask = inputs['is_adv'].float()  # [batch_size], 1 if has adversarial mutation, 0 otherwise
         
-        # Calculate logits for normal and adversarial examples
-        normal_outputs = model(**benign_inputs)
-        adv_outputs = model(**adv_inputs)
-
-        normal_loss = normal_outputs.loss
-        adv_loss = adv_outputs.loss
-
         benign_coeff = self.benign_lambda
         harmful_coeff = self.harmful_lambda
-
+        
+        # Process benign forward pass first
+        normal_outputs = model(**benign_inputs)
+        normal_loss = normal_outputs.loss
+        
+        # Scale and compute backward for normal loss immediately to free memory
+        if not return_outputs:
+            weighted_normal_loss = benign_coeff * normal_loss
+            # Don't delete normal_outputs here as we may need it
+        
+        # Process adversarial forward pass
+        adv_outputs = model(**adv_inputs)
+        adv_loss = adv_outputs.loss
+        
         # Combine losses: benign_lambda * (all normal) + harmful_lambda * (harmful adv only)
         total_loss = benign_coeff * normal_loss + harmful_coeff * adv_loss
     

@@ -255,12 +255,6 @@ class TrainingArguments(TrainingArguments):
             "help": "The run id for the training."
         },
     )
-    dataset_log_dir: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": "The directory to store the dataset logs."
-        },
-    )
     probe_epoch: Optional[int] = field(
         default=0,
         metadata={
@@ -284,3 +278,9 @@ class TrainingArguments(TrainingArguments):
             self.fsdp_config = fsdp_config[self.fsdp_config]
         
         super().__post_init__()
+
+@dataclass
+class PipelineArguments:
+    epoch: int = field(default=0, metadata={"help": "Outer epoch index (for checkpoint naming)."})
+    probe_json_path: str = field(default="", metadata={"help": "Path to probed harmful json from run_probe.py"})
+    merge_lora_at_end: bool = field(default=False, metadata={"help": "Whether to merge LoRA at end of this run."})
