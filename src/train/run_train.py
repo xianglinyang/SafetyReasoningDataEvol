@@ -23,7 +23,7 @@ from src.data_utils.RobustSCoT_datasets import SafetyReasoningDataset, SafetyDat
 from src.logger.config import setup_logging
 from src.logger.train_log import LoggingCallback
 from src.utils.train_utils import load_tokenizer_and_model, merge_lora_checkpoint
-from src.llm_zoo import load_model
+from src.train.probe_and_select import load_processed_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -50,13 +50,10 @@ async def main():
     tokenizer, model = load_tokenizer_and_model(model_args)
     
     # Store original values for outer loop
-    num_outer_epochs = int(training_args.num_train_epochs)
     original_output_dir = training_args.output_dir
-
 
     # -------------------------------- datasets --------------------------------
     # load benign and harmful datasets
-    from src.train.probe_and_select import load_processed_dataset
     benign_dataset, harmful_dataset = load_processed_dataset(data_args.probe_results_path)
 
     # shuffle the dataset
