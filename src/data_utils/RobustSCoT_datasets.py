@@ -64,25 +64,13 @@ def data_reader(dataset_name: str):
                 "question": prompt,
                 "answer": completion,
             })
-
-        with open(os.path.join(DATA_DIR, f'circuit_breakers_train_diverse.json')) as file:
-            dataset = json.load(file)
-        random.shuffle(dataset)
-        dataset = dataset[:2000]
-        for i, d in enumerate(dataset * 2):
-            prompt = d['prompt']
-            completion = d['llama3_output']
-            new_benign_dataset.append({
-                "question": prompt,
-                "answer": completion,
-            })
         
         # refusal part
         with open(os.path.join(DATA_DIR, f'circuit_breakers_train_diverse.json')) as file:
             dataset = json.load(file)
         for d in dataset:
             prompt = d['prompt']
-            completion = d['output']
+            completion = d['llama3_output']
             mutations = d.get('mutations', [])
             if len(mutations) > 0:
                 new_harmful_dataset.append({
