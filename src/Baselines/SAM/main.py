@@ -73,16 +73,10 @@ def main():
     else: 
         retain_dataset = ultrachat_dataset + xstest_dataset
     
-    circuitbreaker_train_cb_dataset = data_reader("circuitbreaker-train-cb", prob)
     circuitbreaker_val_dataset = data_reader("circuitbreaker-val", prob)
 
-    refusal_dataset = circuitbreaker_train_cb_dataset
-
-    train_dataset = refusal_dataset + retain_dataset
-    val_dataset = circuitbreaker_val_dataset
-
-    train_dataset = SAMDataset(train_dataset, tokenizer, max_length=data_args.max_length)
-    val_dataset = SAMDataset(val_dataset, tokenizer, max_length=data_args.max_length)
+    train_dataset = SAMDataset(retain_dataset, tokenizer, max_length=data_args.max_length)
+    val_dataset = SAMDataset(circuitbreaker_val_dataset, tokenizer, max_length=data_args.max_length)
 
     print("TRAIN LEN: ", len(train_dataset))
     print("VAL LEN: ", len(val_dataset))
