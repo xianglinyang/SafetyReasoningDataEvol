@@ -66,7 +66,7 @@ def data_reader(dataset_name: str, prob=1.0):
         with open("data/raw/circuit_breakers_train.json") as file:
             dataset = json.load(file)
         random.shuffle(dataset)
-        dataset = dataset[:2000]
+        # dataset = dataset[:2000]
         
         refusal_retain_orig = []
         for i, d in enumerate(dataset * 2):
