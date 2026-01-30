@@ -2,7 +2,6 @@
 # '''Adapted from https://github.com/princeton-nlp/LESS/tree/main/less/scripts'''
 
 # ---------os env---------
-# Remove the CUDA_VISIBLE_DEVICES line since we want to use multiple GPUs
 # export CUDA_VISIBLE_DEVICES=1
 
 # PyTorch memory optimization
@@ -10,7 +9,8 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # ---------base arguments---------
 ID=$RANDOM
-header="CUDA_VISIBLE_DEVICES=1 torchrun --nproc_per_node=1 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.run_train"
+PROBE_EPOCH=0
+header="CUDA_VISIBLE_DEVICES=0,1 torchrun --nproc_per_node=2 --nnodes=1 --rdzv-id=$ID --rdzv_backend=c10d -m src.train.run_train"
 
 base_arguments="\
 --max_seq_length 2048 \
@@ -45,8 +45,8 @@ base_arguments="\
 --remove_unused_columns False
 --benign_lambda 1
 --harmful_lambda 1
---probe_results_path /data2/xianglin/RobustSCoT/scot_outputs/circuitbreaker_diverse/llama3-8b/epoch_0
---probe_epoch 0
+--probe_results_path /data2/xianglin/RobustSCoT/scot_outputs/circuitbreaker_diverse/llama3-8b/dataset/epoch_${PROBE_EPOCH}
+--probe_epoch ${PROBE_EPOCH}
 --merge_lora_after_training 1
 "
 
@@ -59,19 +59,11 @@ out_dir="/data2/xianglin/RobustSCoT/scot_outputs/circuitbreaker_diverse/llama3-8
 
 # Loop through each dataset
 for dataset_name in ${dataset_names[@]}; do
-    # loop through each model
-    # output dir format with model name+date+time
-    output_dir="${out_dir}/checkpoint-epoch-${probe_epoch}"
-    if [[ ! -d $output_dir ]]; then
-        mkdir -p $output_dir
-    fi
-
-    # for the same command, the log file name is the same
     run_id=$RANDOM
 
     full_command="$header $base_arguments \
     --dataset_name $dataset_name \
-    --output_dir $output_dir \
+    --output_dir $out_dir \
     --model_name_or_path ${model_name_or_path} \
     --model_nickname ${model_name_abbr} \
     --run_id $run_id"

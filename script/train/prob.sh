@@ -3,7 +3,7 @@
 MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
 NICKNAME="llama3-8b"
 DATASET_NAME="circuitbreaker_diverse"
-OUTPUT_PATH="/data2/xianglin/RobustSCoT/scot_outputs/${DATASET_NAME}/${NICKNAME}"
+OUTPUT_PATH="/data2/xianglin/RobustSCoT/scot_outputs/${DATASET_NAME}/${NICKNAME}/dataset"
 K_ANS_TOKENS="64"
 MAX_SAMPLES="${MAX_SAMPLES:-}"  # Empty means use all samples
 GPU_MEMORY_UTILIZATION=0.9
