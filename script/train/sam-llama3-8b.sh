@@ -1,5 +1,5 @@
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-export OUTPUTS_PATH=/mnt/hdd/jiahao/xianglin/RobustSCoT
+export CUDA_VISIBLE_DEVICES=1
+export OUTPUTS_PATH=/data2/xianglin/RobustSCoT
 
 # Get the directory of this script and find project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -18,8 +18,7 @@ MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
 # --multi_gpu \
 # --num_processes 2 \
 accelerate launch \
-    --multi_gpu \
-    --num_processes 4 \
+    --num_processes 1 \
     --mixed_precision bf16 \
     src/Baselines/SAM/main.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
@@ -48,4 +47,4 @@ accelerate launch \
     --target_modules q_proj k_proj v_proj up_proj down_proj \
     --rho 0.05 \
     --adaptive False \
-    --max_grad_norm 1.0 \
+    # --sam_max_grad_norm 1.0 \
