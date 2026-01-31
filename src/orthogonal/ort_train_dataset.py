@@ -16,6 +16,8 @@ def data_reader(dataset_name: str, prob=1.0):
     if dataset_name == "ultrachat":
         # ======================= Retain ======================= #
         ds = load_dataset("HuggingFaceH4/ultrachat_200k", split="test_sft")
+        # shuffle the dataset
+        ds = ds.shuffle(seed=42)
         orig_s = []
         for example in ds:
             messages = example["messages"]
@@ -29,7 +31,7 @@ def data_reader(dataset_name: str, prob=1.0):
                     message = messages[:2]
                     message[0]['content'] = ""
                     orig_s.append(message)
-            if len(orig_s) >= 2000:
+            if len(orig_s) >= 10000:
                 break
 
         random.shuffle(orig_s)
@@ -42,7 +44,7 @@ def data_reader(dataset_name: str, prob=1.0):
             data = [row for row in data if row['final_label'] == "1_full_compliance"]
         
         borderline_orig_s = []
-        for i, d in enumerate(data * 50):
+        for i, d in enumerate(data):
             prompt = d['prompt']
             completion = d['completion']
             
@@ -66,7 +68,6 @@ def data_reader(dataset_name: str, prob=1.0):
         with open("data/raw/circuit_breakers_train.json") as file:
             dataset = json.load(file)
         random.shuffle(dataset)
-        dataset = dataset[:2000]
         
         refusal_retain_orig = []
         for i, d in enumerate(dataset * 2):

@@ -57,10 +57,19 @@ class LoraArguments:
     )
 
 @dataclass
-class ORTArguments:
+class OrthSAMArguments:
     rho: float = field(
         default=0.05, metadata={"help": "SAM radius"}
     )
     adaptive: bool = field(
         default=False, metadata={"help": "Adaptive SAM"}
+    )
+    lam_u: float = field(
+        default=0.1, metadata={"help": "Lambda for retain loss weighting"}
+    )
+    eps: float = field(
+        default=1e-12, metadata={"help": "Epsilon for SAM"}
+    )
+    orth_sam_max_grad_norm: Optional[float] = field(
+        default=None, metadata={"help": "Max gradient norm for SAM"}
     )

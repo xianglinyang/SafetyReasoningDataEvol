@@ -156,7 +156,6 @@ def merge_lora_checkpoint(base_model_path: str, output_path: str, device: str = 
 def save_tokenizer_and_model(model, tokenizer, training_args):
     # Save final model
     logger.info("*** Saving final model ***")
-
     # LoRA model, need to merge before saving
     merge_model = model.merge_and_unload()
     assert merge_model.get_input_embeddings().weight.shape[0] == len(tokenizer)
