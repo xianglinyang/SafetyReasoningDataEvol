@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 export OUTPUTS_PATH=/data2/xianglin/RobustSCoT
 
 # Get the directory of this script and find project root
@@ -20,7 +20,7 @@ MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
 accelerate launch \
     --num_processes 1 \
     --mixed_precision bf16 \
-    src/orthogonal/main.py \
+    src/orthogonal/main_wo_retain.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
     --dataset_name circuitbreaker \
     --use_lora \
