@@ -1,6 +1,5 @@
 import torch
-
-import torch
+from tqdm import tqdm
 
 # --- helpers (放在训练 loop 外面即可) ---
 def _clone_grads(params):
@@ -65,61 +64,6 @@ def _get_d(params, theta0, d_ema, use_ema=True, beta=0.97):
             d_ema[i].mul_(beta).add_(d[i], alpha=(1 - beta))
     return d_ema, d_ema
 
-
-# @torch.no_grad()
-# def _orth_perturb_first_step(optimizer, params, g_u, g_h, rho, eps=1e-12, zero_grad=True, fallback="gh"):
-#     """
-#     用 g_h 在 g_u 上投影剪掉后的方向 g_perp 做 SAM 扰动：
-#       g_perp = g_h - <g_h,g_u> / (||g_u||^2+eps) * g_u
-#       w <- w + rho * g_perp / (||g_perp||+eps)
-
-#     这里把 old_p 存进 optimizer.state[p]["old_p"]，后面可直接用 optimizer.restore().
-#     fallback:
-#       - "gh": 若 g_perp 近似 0，就退化用 g_h
-#       - "none": 若 g_perp 近似 0，就不扰动
-#     """
-#     gu_n2 = _norm2(g_u)
-#     if gu_n2 is None or gu_n2.detach().item() == 0.0:
-#         g_perp = g_h
-#     else:
-#         gh_dot_gu = _dot(g_h, g_u)
-#         coef = gh_dot_gu / (gu_n2 + eps)
-#         g_perp = []
-#         for gh_i, gu_i in zip(g_h, g_u):
-#             if gh_i is None:
-#                 g_perp.append(None)
-#             elif gu_i is None:
-#                 g_perp.append(gh_i)
-#             else:
-#                 g_perp.append(gh_i - coef * gu_i)
-
-#     # if g_perp is ~0, fallback
-#     gp_n2 = _norm2(g_perp)
-#     gp_norm = torch.sqrt((gp_n2 if gp_n2 is not None else torch.tensor(0.0, device=params[0].device)) + eps)
-#     if gp_norm.detach().item() == 0.0:
-#         if fallback == "gh":
-#             g_perp = g_h
-#             gp_n2 = _norm2(g_perp)
-#             gp_norm = torch.sqrt((gp_n2 if gp_n2 is not None else torch.tensor(0.0, device=params[0].device)) + eps)
-#         elif fallback == "none":
-#             if zero_grad:
-#                 optimizer.zero_grad(set_to_none=True)
-#             return
-
-#     scale = rho / (gp_norm + eps)
-
-#     # save and perturb
-#     for p, d in zip(params, g_perp):
-#         if d is None:
-#             continue
-#         optimizer.state[p]["old_p"] = p.detach().clone()
-#         p.add_(d, alpha=scale)
-
-#     if zero_grad:
-#         optimizer.zero_grad(set_to_none=True)
-
-
-import torch
 
 @torch.no_grad()
 def _orth_perturb_first_step(
@@ -209,6 +153,71 @@ def _orth_perturb_first_step(
         optimizer.zero_grad(set_to_none=True)
 
     return alpha, alpha_eff
+
+
+@torch.no_grad()
+def _zero_trainable_grads(trainable_params):
+    for p in trainable_params:
+        p.grad = None
+
+def compute_mean_utility_grad(
+    model,
+    retain_loader,
+    trainable_params,
+    accelerator,
+    max_batches=512,      # None=全量；建议先用 128~512
+    use_eval=True,        # True: 关 dropout，更稳定
+):
+    was_training = model.training
+    model.eval() if use_eval else model.train()
+
+    # fp32 累加更稳
+    accum = [torch.zeros_like(p, dtype=torch.float32) for p in trainable_params]
+    cnt = torch.tensor(0.0, device=trainable_params[0].device)
+
+    for i, batch in tqdm(enumerate(retain_loader)):
+        if max_batches is not None and i >= max_batches:
+            break
+
+        _zero_trainable_grads(trainable_params)
+
+        out = model(**batch)
+        loss = out.loss
+        accelerator.backward(loss)
+
+        with torch.no_grad():
+            for k, p in enumerate(trainable_params):
+                if p.grad is None:
+                    continue
+                accum[k].add_(p.grad.detach().float())
+            cnt += 1.0
+
+    # 分布式：把不同进程的累加求和
+    if accelerator.num_processes > 1:
+        cnt = accelerator.reduce(cnt, reduction="sum")
+        for k in range(len(accum)):
+            accum[k] = accelerator.reduce(accum[k], reduction="sum")
+
+    denom = cnt.clamp_min(1.0)
+    g_u_mean = [a / denom for a in accum]   # fp32 list
+
+    _zero_trainable_grads(trainable_params)
+    model.train(was_training)
+    return g_u_mean
+
+@torch.no_grad()
+def normalize_grad_list(g_list, eps=1e-12):
+    n2 = None
+    for g in g_list:
+        if g is None:
+            continue
+        v = (g * g).sum()
+        n2 = v if n2 is None else (n2 + v)
+    if n2 is None:
+        return g_list
+    n = torch.sqrt(n2 + eps)
+    return [g / n for g in g_list]
+
 
 
 class OrthSAM(torch.optim.Optimizer):

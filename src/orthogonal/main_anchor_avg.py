@@ -19,13 +19,14 @@ from ort_train_dataset import ORTDataset, data_reader, ort_collate_fn
 from utils import save_tokenizer_and_model
 import logging
 from tqdm import tqdm
-from ort_opti import _clone_grads, _orth_perturb_first_step, OrthSAM, _norm2
+from ort_opti import _clone_grads, OrthSAM, compute_mean_utility_grad, normalize_grad_list, _orth_perturb_first_step
 import os
 import copy
 
 logger = logging.getLogger(__name__)
 
 
+# --- Main Function ---
 def main():
     # Stage 0: Get the arguments
     parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments, LoraArguments, OrthSAMArguments))
@@ -76,7 +77,6 @@ def main():
     xstest_dataset = data_reader("xstest", prob)
     rr_dataset = data_reader("circuitbreaker-train-retain", prob)
     
-    
     # Check if use_refusal_retain attribute exists
     retain_dataset = ultrachat_dataset
     refusal_dataset = rr_dataset+xstest_dataset
@@ -109,26 +109,29 @@ def main():
     warmup_steps = int(total_steps * training_args.warmup_ratio)
     scheduler = get_linear_schedule_with_warmup(optimizer.base_optimizer, warmup_steps, total_steps)
 
-    # model, train_loader, scheduler = accelerator.prepare(model, train_loader, scheduler)
+    # # model, train_loader, scheduler = accelerator.prepare(model, train_loader, scheduler)
     model, refusal_loader, retain_loader, scheduler = accelerator.prepare(model, refusal_loader, retain_loader, scheduler)
+
+    # 训练前算一次全局 mean retain gradient（建议先 256 个 batch 快速试）
+    retain_mean_batches = getattr(ort_args, "retain_mean_batches", 512)
+    g_u_mean = compute_mean_utility_grad(
+        model=model,
+        retain_loader=retain_loader,
+        trainable_params=trainable_params,
+        accelerator=accelerator,
+        max_batches=retain_mean_batches,
+        use_eval=True,
+    )
+    g_u_mean = normalize_grad_list(g_u_mean)  # 可选：让投影更稳定
 
     model.train()
     global_step = 0
 
     # hyperparameter init
-    beta = getattr(ort_args, "ema_beta", 0.97)   # retain grad EMA
-    gamma = getattr(ort_args, "lam_ema", 0.1)    # lam smooth
-    tau = getattr(ort_args, "lam_tau", 1.0)      # target ratio
-    lam_min = getattr(ort_args, "lam_min", 0.02)
-    lam_max = getattr(ort_args, "lam_max", 15.0)
-
-    lam_u = float(getattr(ort_args, "lam_u", 10.0))  # initial
-
-    g_u_ema = None  # list-of-tensors, same structure as trainable_params grads
-    eps = getattr(ort_args, "eps", 1e-12)
-
     proj_scale = float(getattr(ort_args, "proj_scale", 1.0))
-    one_sided = bool(getattr(ort_args, "one_sided", True))
+    one_sided  = bool(getattr(ort_args, "one_sided", True))
+    eps = float(getattr(ort_args, "eps", 1e-12))
+    lam_u = float(getattr(ort_args, "lam_u", 0.1))  # retain loss weight（可后续做动态）
 
     # Create progress bar
     pbar = tqdm(total=total_steps, desc="Training", disable=not accelerator.is_main_process)
@@ -149,35 +152,24 @@ def main():
             model.train()
             optimizer.zero_grad(set_to_none=True)
 
-            # (1) retain raw grad (no lam here!)
+            # (1) retain normal grad at w: accumulate grads onto existing grads
             loss_u = model(**retain_batch).loss
-            accelerator.backward(loss_u)
-            g_u_raw = _clone_grads(trainable_params)
+            loss_u_w = lam_u * loss_u
+            accelerator.backward(loss_u_w)
 
-            # update EMA basis
-            if g_u_ema is None:
-                g_u_ema = [None if g is None else g.clone() for g in g_u_raw]
-            else:
-                for i, g in enumerate(g_u_raw):
-                    if g is None: 
-                        continue
-                    if g_u_ema[i] is None:
-                        g_u_ema[i] = g.clone()
-                    else:
-                        g_u_ema[i].mul_(beta).add_(g, alpha=(1 - beta))
-
+            g_u_step = _clone_grads(trainable_params)   # ✅ 之后加回 step-2 梯度里
             optimizer.zero_grad(set_to_none=True)
 
-            # (2) refusal 梯度 g_h（在原权重 w）
+            # (2) refusal grad at w
             loss_h = model(**refusal_batch).loss
             accelerator.backward(loss_h)
-            g_h = _clone_grads(trainable_params)
-
-            # (3) orth perturb using EMA basis (use g_u_ema instead of g_u_raw)
+            g_h = _clone_grads(trainable_params)        # refusal grads (w)
+            
+            # (3) set g_u_mean as the projection basis for soft projection：g_dir = g_h - proj_scale * proj_{g_u_mean}(g_h)
             alpha, alpha_eff = _orth_perturb_first_step(
                 optimizer=optimizer,
                 params=trainable_params,
-                g_u=g_u_ema,     # <-- EMA basis
+                g_u=g_u_mean,          # ✅ 这里用全局 mean，不再用 batch g_u
                 g_h=g_h,
                 rho=ort_args.rho,
                 eps=eps,
@@ -186,34 +178,24 @@ def main():
                 proj_scale=proj_scale,
                 one_sided=one_sided,
             )
-            print(f"alpha: {alpha:.4f}, alpha_eff: {alpha_eff:.4f}")
 
-            # (4) refusal SAM step-2：在 w+e 上算梯度
+            # (4) refusal SAM step-2: grad at w+e
             loss2 = model(**refusal_batch).loss
             accelerator.backward(loss2)
-
-            # (5) restore 回原权重 w（保留 step-2 梯度）
+            # restore weights back to w (keep step-2 grads)
             optimizer.restore()
 
-            # (5.1) dynamic lam_u using norm ratio (compute norms)
-            norm_u = torch.sqrt(_norm2(g_u_raw) + eps)
-            norm_h2 = torch.sqrt(_norm2([p.grad.detach() if p.grad is not None else None for p in trainable_params]) + eps)
-
-            lam_star = (tau * (norm_h2 / (norm_u + eps))).detach().item()
-            lam_star = max(lam_min, min(lam_max, lam_star))
-            lam_u = (1 - gamma) * lam_u + gamma * lam_star
-
-            # (6) add weighted retain grads onto current grads
+            # (5) add retain grads back: grad_total = grad_step2 + g_u_step
             with torch.no_grad():
-                for p, gu in zip(trainable_params, g_u_raw):
+                for p, gu in zip(trainable_params, g_u_step):
                     if gu is None:
                         continue
                     if p.grad is None:
-                        p.grad = (lam_u * gu).clone()
+                        p.grad = gu.clone()
                     else:
-                        p.grad.add_(gu, alpha=lam_u)
-
-            # (7) clip + 一次更新
+                        p.grad.add_(gu)
+            
+            # (6) update once
             if ort_args.orth_sam_max_grad_norm is not None and accelerator.sync_gradients:
                 accelerator.clip_grad_norm_(model.parameters(), ort_args.orth_sam_max_grad_norm)
 
@@ -221,18 +203,13 @@ def main():
             scheduler.step()
             global_step += 1
 
-            # (8) logging / progress
+            # (7) logging / progress
             #   loss_refusal      = harmful/refusal loss at w
             #   loss_retain_w     = lam_u * retain loss at w
             #   loss_refusal_sam  = refusal loss at w+e (orth direction)
             loss_h_val = float(loss_h.detach().item())
-            loss_u_val = float(loss_u.detach().item())
             loss2_val  = float(loss2.detach().item())   # orth-SAM step-2 loss
-
-            # 你之前写的 loss_report 也保留（用于 epoch 累加）
-            loss_report = loss_u.detach() + loss_h.detach() + loss2.detach()
-            epoch_loss += float(loss_report.item())
-            epoch_loss_sam += float(loss2.detach().item())
+            epoch_loss += float(loss_h.detach().item()) + float(loss2.detach().item())
             num_batches += 1
 
             pbar.update(1)
@@ -240,14 +217,14 @@ def main():
                 pbar.set_postfix({
                     'epoch': epoch + 1,
                     'loss_h': f'{loss_h_val:.4f}',
-                    'loss_u': f'{loss_u_val:.4f}',
                     'loss_ort': f'{loss2_val:.4f}',
-                    "dynamic_lam_u": f'{lam_u:.4f}',
+                    'alpha': f'{alpha:.4f}',
+                    'alpha_eff': f'{alpha_eff:.4f}',
                     'lr': f'{scheduler.get_last_lr()[0]:.2e}',
                 })
 
             # 释放 loss 张量和 batch 数据（减少显存峰值）
-            del loss_u, loss_h, loss2, refusal_batch, retain_batch
+            del loss_h, loss2, refusal_batch, retain_batch
 
             # 每 100 步清理一次 CUDA 缓存（可选：可能略影响性能，但能缓解碎片）
             if global_step % 100 == 0:

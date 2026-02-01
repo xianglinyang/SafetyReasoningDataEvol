@@ -20,16 +20,16 @@ MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
 accelerate launch \
     --num_processes 1 \
     --mixed_precision bf16 \
-    src/orthogonal/main.py \
+    src/orthogonal/main_anchor_avg.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
     --dataset_name circuitbreaker \
     --use_lora \
-    --output_dir ${OUTPUTS_PATH}/ort_outputs/${MODEL_NAME}-ort-ablation \
+    --output_dir ${OUTPUTS_PATH}/ort_outputs/${MODEL_NAME}-ort-anchor-avg \
     --bf16 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 1 \
-    --learning_rate 2e-4 \
+    --learning_rate 2e-5 \
     --lr_scheduler_type cosine \
     --warmup_ratio 0.02 \
     --report_to none \
@@ -48,5 +48,5 @@ accelerate launch \
     --rho 0.05 \
     --adaptive False \
     --orth_sam_max_grad_norm 1.0 \
-    --lam_u 5.0 \
-    --proj_scale 0.0 \
+    --lam_u 0.1 \
+    --proj_scale 1.0 \

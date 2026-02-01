@@ -65,7 +65,7 @@ class OrthSAMArguments:
         default=False, metadata={"help": "Adaptive SAM"}
     )
     lam_u: float = field(
-        default=0.05, metadata={"help": "Lambda for retain loss weighting"}
+        default=2.0, metadata={"help": "Lambda for retain loss weighting"}
     )
     eps: float = field(
         default=1e-12, metadata={"help": "Epsilon for SAM"}

@@ -24,7 +24,7 @@ accelerate launch \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
     --dataset_name circuitbreaker \
     --use_lora \
-    --output_dir ${OUTPUTS_PATH}/ort_outputs/${MODEL_NAME}-ort \
+    --output_dir ${OUTPUTS_PATH}/ort_outputs/${MODEL_NAME}-ort-wo-retain-ablation \
     --bf16 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 1 \
@@ -48,4 +48,5 @@ accelerate launch \
     --rho 0.05 \
     --adaptive False \
     --orth_sam_max_grad_norm 1.0 \
-    --lam_u 10.0 \
+    --lam_u 2.0 \
+    --proj_scale 0.0 \
