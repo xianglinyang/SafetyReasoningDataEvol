@@ -4,6 +4,16 @@ export WANDB_MODE=offline
 export MASTER_PORT=$((29000 + RANDOM % 1000))
 export CUBLAS_WORKSPACE_CONFIG=:16:8
 
+# Get the directory of this script and find project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "${SCRIPT_DIR}/../.." && pwd )"
+
+# Set PYTHONPATH to include the project root
+export PYTHONPATH="${PYTHONPATH}:${PROJECT_ROOT}"
+
+# Change to project root directory
+cd ${PROJECT_ROOT}
+
 ### Llama-3-8B Config ###
 model_name_or_path=meta-llama/Meta-Llama-3-8B-Instruct
 model_name="Meta-Llama-3-8B-Instruct"

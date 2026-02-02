@@ -1,5 +1,15 @@
 export CUDA_VISIBLE_DEVICES=0
 
+# Get the directory of this script and find project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "${SCRIPT_DIR}/../.." && pwd )"
+
+# Set PYTHONPATH to include the project root
+export PYTHONPATH="${PYTHONPATH}:${PROJECT_ROOT}"
+
+# Change to project root directory
+cd ${PROJECT_ROOT}
+
 OUTPUTS_PATH="/data2/xianglin/RobustSCoT"
 mkdir -p ${OUTPUTS_PATH}/r2d_outputs
 

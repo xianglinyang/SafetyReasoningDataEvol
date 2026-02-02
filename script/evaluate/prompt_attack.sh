@@ -51,9 +51,9 @@ model_name_or_path_list=(
     # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-anchor-avg"
     # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-R2D-R1-ort"
     # "/data2/xianglin/RobustSCoT/r2d_outputs/Meta-Llama-3-8B-r2d"
-    # "/data2/xianglin/RobustSCoT/ort_outputs/DeepSeek-R1-Distill-Qwen-7B-R2D-R1-ort/checkpoint-epoch-2"
+    "/data2/xianglin/RobustSCoT/ort_outputs/DeepSeek-R1-Distill-Qwen-7B-R2D-R1-ort"
     # "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-    "/data2/xianglin/RobustSCoT/r2d_outputs/DeepSeek-R1-Distill-Qwen-7B-r2d"
+    # "/data2/xianglin/RobustSCoT/r2d_outputs/DeepSeek-R1-Distill-Qwen-7B-r2d"
     # ""
 )
 dataset_name_list=(
@@ -69,8 +69,8 @@ dataset_name_list=(
     # "CSRT"
 
     "wildjailbreak"
-    "XSafety"
-    "PolyGuardMix"
+    # "XSafety"
+    # "PolyGuardMix"
 
 )
 attack_name_list=(

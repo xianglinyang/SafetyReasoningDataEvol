@@ -1,5 +1,14 @@
 export CUDA_VISIBLE_DEVICES=1
 
+# Get the directory of this script and find project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "${SCRIPT_DIR}/../.." && pwd )"
+
+# Set PYTHONPATH to include the project root
+export PYTHONPATH="${PYTHONPATH}:${PROJECT_ROOT}"
+
+# Change to project root directory
+cd ${PROJECT_ROOT}
 
 OUTPUTS_PATH="/data2/xianglin/RobustSCoT"
 mkdir -p ${OUTPUTS_PATH}/ort_outputs
@@ -7,6 +16,9 @@ mkdir -p ${OUTPUTS_PATH}/ort_outputs
 MODEL_NAME="DeepSeek-R1-Distill-Qwen-7B"
 MODEL_NAME_OR_PATH="deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
 DATASET_NAME="R2D-R1"
+# MODEL_NAME="Meta-Llama-3-8B"
+# MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
+# DATASET_NAME="circuitbreaker"
 # --multi_gpu \
 # --num_processes 2 \
 
