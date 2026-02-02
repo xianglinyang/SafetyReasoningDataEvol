@@ -3,7 +3,7 @@ per_gpu_jobs_num=1
 
 gpu_num=1
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(0)
+gpu_ids=(1)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -11,8 +11,9 @@ gpu_ids=(0)
 gpu_setup="single"
 
 model_name_or_path_list=(
-    "meta-llama/Llama-3.1-8B-Instruct"
+    # "meta-llama/Llama-3.1-8B-Instruct"
     # "mistralai/Mistral-7B-Instruct-v0.2"
+    # "meta-llama/Meta-Llama-3-8B-Instruct"
 
     # "GraySwanAI/Llama-3-8B-Instruct-RR"
     # "GraySwanAI/Mistral-7B-Instruct-RR"
@@ -43,7 +44,17 @@ model_name_or_path_list=(
     # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251219-165422/checkpoint-933"
     # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-933"
     # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-1244"
-
+    # "/data2/xianglin/RobustSCoT/sam_outputs/Meta-Llama-3-8B-sam"
+    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-ablation"
+    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-wo-retain-ablation"
+    # "/data2/xianglin/RobustSCoT/ort_outputs/Llama-3.1-8B-ort"
+    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-anchor-avg"
+    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-R2D-R1-ort"
+    # "/data2/xianglin/RobustSCoT/r2d_outputs/Meta-Llama-3-8B-r2d"
+    # "/data2/xianglin/RobustSCoT/ort_outputs/DeepSeek-R1-Distill-Qwen-7B-R2D-R1-ort/checkpoint-epoch-2"
+    # "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+    "/data2/xianglin/RobustSCoT/r2d_outputs/DeepSeek-R1-Distill-Qwen-7B-r2d"
+    # ""
 )
 dataset_name_list=(
     # "sorrybench"
@@ -64,16 +75,16 @@ dataset_name_list=(
 )
 attack_name_list=(
     "none"
-    "refusal_suppression"
-    "prefix_injection"
+    # "refusal_suppression"
+    # "prefix_injection"
     # "base64"
     # "base64_input_only"
-    "style_injection_short"
-    "style_injection_json"
-    "distractors"
-    "disemvowel"
-    "leetspeak"
-    "poems"
+    # "style_injection_short"
+    # "style_injection_json"
+    # "distractors"
+    # "disemvowel"
+    # "leetspeak"
+    # "poems"
 )
 
 splits=(
@@ -169,7 +180,7 @@ prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 800"
+--eval_num 500"
 
 # Counter to distribute commands across GPUs
 counter=0
