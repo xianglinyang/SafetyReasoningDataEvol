@@ -80,19 +80,22 @@ def main():
         eps=1e-8,
     )
 
-    # # Stage 1: Prepare the dataset
-    # # prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
-    # prob = 1.0
-    # ultrachat_dataset = data_reader("ultrachat", prob)
-    # xstest_dataset = data_reader("xstest", prob)
-    # rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+    # Stage 1: Prepare the dataset
+    # prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
+    prob = 1.0
+    if data_args.dataset_name == "circuitbreaker":
+        ultrachat_dataset = data_reader("ultrachat", prob)
+        xstest_dataset = data_reader("xstest", prob)
+        rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+        retain_dataset = ultrachat_dataset
+        refusal_dataset = rr_dataset+xstest_dataset
+    elif data_args.dataset_name == "R2D-R1":
+        retain_dataset = data_reader("R2D-R1-benign", prob)
+        refusal_dataset = data_reader("R2D-R1-harmful", prob)
     
-    # # Check if use_refusal_retain attribute exists
-    # retain_dataset = ultrachat_dataset
-    # refusal_dataset = rr_dataset+xstest_dataset
-    retain_dataset = data_reader("R2D-R1-benign")
-    refusal_dataset = data_reader("R2D-R1-harmful")
-    
+    else:
+        raise ValueError(f"Unknown dataset name: {data_args.dataset_name}")
+
     # refusal / harmful loader
     refusal_train = ORTDataset(refusal_dataset, tokenizer, max_length=data_args.max_length)
     refusal_loader = DataLoader(
@@ -121,8 +124,12 @@ def main():
     warmup_steps = int(total_steps * training_args.warmup_ratio)
     scheduler = get_linear_schedule_with_warmup(optimizer.base_optimizer, warmup_steps, total_steps)
 
-    # model, train_loader, scheduler = accelerator.prepare(model, train_loader, scheduler)
-    model, refusal_loader, retain_loader, scheduler = accelerator.prepare(model, refusal_loader, retain_loader, scheduler)
+    # Only prepare base_optimizer with DeepSpeed, not the OrthSAM wrapper
+    model, base_optimizer_prepared, refusal_loader, retain_loader, scheduler = accelerator.prepare(
+        model, optimizer.base_optimizer, refusal_loader, retain_loader, scheduler
+    )
+    # Update OrthSAM's base_optimizer reference to the prepared one
+    optimizer.base_optimizer = base_optimizer_prepared
 
     model.train()
     global_step = 0
@@ -143,9 +150,9 @@ def main():
     one_sided = bool(getattr(ort_args, "one_sided", True))
 
     # Create progress bar
+    retain_iter = iter(retain_loader)
     pbar = tqdm(total=total_steps, desc="Training", disable=not accelerator.is_main_process)
     for epoch in range(num_epochs):
-        retain_iter = iter(retain_loader)
         epoch_loss = 0.0
         epoch_loss_sam = 0.0
         num_batches = 0

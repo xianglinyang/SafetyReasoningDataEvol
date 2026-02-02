@@ -76,3 +76,21 @@ class OrthSAMArguments:
     proj_scale: float = field(
         default=1.0, metadata={"help": "Projection scale for SAM"}
     )
+    lam_min: float = field(
+        default=0.02, metadata={"help": "Minimum lambda for retain loss weighting"}
+    )
+    lam_max: float = field(
+        default=5.0, metadata={"help": "Maximum lambda for retain loss weighting"}
+    )
+    lam_ema: float = field(
+        default=0.1, metadata={"help": "EMA lambda for retain loss weighting"}
+    )
+    lam_tau: float = field(
+        default=0.5, metadata={"help": "Tau for lambda update"}
+    )
+    ema_beta: float = field(
+        default=0.97, metadata={"help": "EMA beta for retain loss weighting"}
+    )
+    one_sided: bool = field(
+        default=True, metadata={"help": "One-sided orthogonal SAM"}
+    )
