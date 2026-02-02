@@ -70,14 +70,18 @@ def main():
     )
 
     # Stage 1: Prepare the dataset (similar to ORT setup)
-    prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
-    ultrachat_dataset = data_reader("ultrachat", prob)
-    xstest_dataset = data_reader("xstest", prob)
-    rr_dataset = data_reader("circuitbreaker-train-retain", prob)
-    
-    # Separate refusal (harmful) and retain (helpful) datasets
-    retain_dataset = ultrachat_dataset
-    refusal_dataset = rr_dataset+xstest_dataset
+    prob = 1.0
+    if data_args.dataset_name == "circuitbreaker":
+        ultrachat_dataset = data_reader("ultrachat", prob)
+        xstest_dataset = data_reader("xstest", prob)
+        rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+        retain_dataset = ultrachat_dataset
+        refusal_dataset = rr_dataset+xstest_dataset
+    elif data_args.dataset_name == "R2D-R1":
+        retain_dataset = data_reader("R2D-R1-benign", prob)
+        refusal_dataset = data_reader("R2D-R1-harmful", prob)
+    else:
+        raise ValueError(f"Unknown dataset name: {data_args.dataset_name}")
     
     
     # refusal / harmful loader

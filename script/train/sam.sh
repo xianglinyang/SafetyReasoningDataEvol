@@ -16,19 +16,16 @@ mkdir -p ${OUTPUTS_PATH}/sam_outputs
 
 MODEL_NAME="Meta-Llama-3-8B"
 MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
+DATASET_NAME="R2D-R1"
 
-
-# --multi_gpu \
-# --num_processes 2 \
-# --config_file src/Baselines/SAM/configs/accelerate_zero1.yaml
 accelerate launch \
     --num_processes 1 \
     --mixed_precision bf16 \
     src/Baselines/SAM/main.py \
     --model_name_or_path ${MODEL_NAME_OR_PATH} \
-    --dataset_name circuitbreaker \
+    --dataset_name ${DATASET_NAME} \
     --use_lora \
-    --output_dir ${OUTPUTS_PATH}/sam_outputs/${MODEL_NAME}-sam \
+    --output_dir ${OUTPUTS_PATH}/sam_outputs/${MODEL_NAME}-${DATASET_NAME}-sam \
     --bf16 \
     --num_train_epochs 1 \
     --per_device_train_batch_size 1 \
