@@ -124,6 +124,40 @@ def data_reader(dataset_name: str, prob=1.0):
             ]
             res.append(messages)
         return res
+    
+    elif dataset_name == "R2D-R1-benign":
+        with open("data/processed/R2D-R1.json") as file:
+            dataset = json.load(file)
+        res = []
+        for d in dataset:
+            prompt = d['instruction']
+            completion = d['output']
+            if d['type'] == "benign":
+                messages = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": completion}
+                ]
+                res.append(messages)
+            else:
+                continue
+        return res
+    elif dataset_name == "R2D-R1-harmful":
+        with open("data/processed/R2D-R1.json") as file:
+            dataset = json.load(file)
+        res = []
+        for d in dataset:
+            prompt = d['instruction']
+            completion = d['output']
+            if d['type'] == "harmful":
+                messages = [
+                    {"role": "user", "content": prompt},
+                    {"role": "assistant", "content": completion}
+                ]
+                res.append(messages)
+                continue
+        return res
+    else:
+        raise ValueError(f"Unknown dataset name: {dataset_name}")
 
 class ORTDataset(Dataset):
     def __init__(self, dataset, tokenizer, max_length=1024):
