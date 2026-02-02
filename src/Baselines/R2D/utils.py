@@ -115,10 +115,13 @@ def merge_lora_checkpoint(base_model_path: str, output_path: str, device: str = 
 
         # --- Resize Embeddings for this specific loaded base model ---
         embedding_size = base_model.get_input_embeddings().weight.shape[0]
-        if len(tokenizer) > embedding_size:
-            logger.info(f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
-            base_model.resize_token_embeddings(len(tokenizer))
-            logger.info("Token embeddings resized for this base model instance.")
+        tokenizer_size = len(tokenizer)
+        logger.info(f"Base model embedding size: {embedding_size}, Tokenizer size: {tokenizer_size}")
+        
+        if tokenizer_size != embedding_size:
+            logger.info(f"Resizing token embeddings from {embedding_size} to {tokenizer_size}")
+            base_model.resize_token_embeddings(tokenizer_size)
+            logger.info(f"Token embeddings resized to {base_model.get_input_embeddings().weight.shape[0]}")
         else:
             logger.info("Token embeddings size matches. No resize needed.")
 

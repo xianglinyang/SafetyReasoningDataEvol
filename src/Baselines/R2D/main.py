@@ -41,11 +41,17 @@ def main():
     )
     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
     
-    tokenizer.pad_token = tokenizer.eos_token
+    # First add special tokens, then set pad_token
+    tokenizer.add_tokens(["[SAFE]", "[UNSAFE]", "[RETHINK]", "<think>", "</think>", "[R2D-Reserve-0]", "[R2D-Reserve-1]", "[R2D-Reserve-2]"])
+    
+    # Set pad_token if not already set
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
     # Set model_max_length to avoid truncation warnings
     tokenizer.model_max_length = data_args.max_length
-    tokenizer.add_tokens(["[SAFE]", "[UNSAFE]", "[RETHINK]", "<think>", "</think>", "[R2D-Reserve-0]", "[R2D-Reserve-1]", "[R2D-Reserve-2]"])
 
+    # Resize model embeddings to match tokenizer
     llm.resize_token_embeddings(len(tokenizer)) 
     logger.info(f"llm.model.embed_tokens.weight[-8:, :]: {llm.model.embed_tokens.weight[-8:, :]}")
     logger.info(f"llm.lm_head.weight[:, -8:]: {llm.lm_head.weight[:, -8:]}")

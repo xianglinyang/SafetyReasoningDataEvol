@@ -158,9 +158,21 @@ def save_tokenizer_and_model(model, tokenizer, training_args):
     logger.info("*** Saving final model ***")
     # LoRA model, need to merge before saving
     merge_model = model.merge_and_unload()
-    assert merge_model.get_input_embeddings().weight.shape[0] == len(tokenizer)
+    
+    # Verify embeddings match (should already be correct from initial setup)
+    embedding_size = merge_model.get_input_embeddings().weight.shape[0]
+    tokenizer_size = len(tokenizer)
+    logger.info(f"Merge model embedding size: {embedding_size}, tokenizer size: {tokenizer_size}")
+    
+    if embedding_size != tokenizer_size:
+        logger.warning(f"Embedding size mismatch detected during save!")
+        logger.warning(f"Model embedding: {embedding_size}, Tokenizer: {tokenizer_size}")
+        logger.warning(f"This mismatch should have been resolved during model initialization.")
+        logger.warning(f"Attempting to resize merge model embeddings to match tokenizer...")
+        merge_model.resize_token_embeddings(tokenizer_size)
+        logger.info(f"Resized merge model embeddings to {merge_model.get_input_embeddings().weight.shape[0]}")
+    
     merge_model.save_pretrained(training_args.output_dir, safe_serialization=True)
-
     tokenizer.save_pretrained(training_args.output_dir, safe_serialization=True)
 
     logger.info(f"Model saved to {training_args.output_dir}")

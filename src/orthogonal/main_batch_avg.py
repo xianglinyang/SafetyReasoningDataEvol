@@ -35,13 +35,24 @@ def main():
     accelerator = Accelerator(mixed_precision="bf16")
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, use_fast=True)
     if tokenizer.pad_token_id is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        # Add a new pad token instead of reusing eos_token
+        tokenizer.add_special_tokens({"pad_token": "<pad>"})
 
     model = AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         torch_dtype=torch.bfloat16,
         device_map=None,  # 交给 accelerate.prepare
     )
+    
+    # Resize embeddings if tokenizer size doesn't match
+    embedding_size = model.get_input_embeddings().weight.shape[0]
+    tokenizer_size = len(tokenizer)
+    logger.info(f"Model embedding size: {embedding_size}, tokenizer size: {tokenizer_size}")
+    
+    if tokenizer_size != embedding_size:
+        logger.info(f"Resizing token embeddings from {embedding_size} to {tokenizer_size}")
+        model.resize_token_embeddings(tokenizer_size)
+        logger.info(f"Token embeddings resized to {model.get_input_embeddings().weight.shape[0]}")
     
     # 启用 gradient checkpointing 以节省内存
     if hasattr(model, 'enable_input_require_grads'):
@@ -69,17 +80,18 @@ def main():
         eps=1e-8,
     )
 
-    # Stage 1: Prepare the dataset
-    # prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
-    prob = 1.0
-    ultrachat_dataset = data_reader("ultrachat", prob)
-    xstest_dataset = data_reader("xstest", prob)
-    rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+    # # Stage 1: Prepare the dataset
+    # # prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
+    # prob = 1.0
+    # ultrachat_dataset = data_reader("ultrachat", prob)
+    # xstest_dataset = data_reader("xstest", prob)
+    # rr_dataset = data_reader("circuitbreaker-train-retain", prob)
     
-    
-    # Check if use_refusal_retain attribute exists
-    retain_dataset = ultrachat_dataset
-    refusal_dataset = rr_dataset+xstest_dataset
+    # # Check if use_refusal_retain attribute exists
+    # retain_dataset = ultrachat_dataset
+    # refusal_dataset = rr_dataset+xstest_dataset
+    retain_dataset = data_reader("R2D-R1-benign")
+    refusal_dataset = data_reader("R2D-R1-harmful")
     
     # refusal / harmful loader
     refusal_train = ORTDataset(refusal_dataset, tokenizer, max_length=data_args.max_length)
