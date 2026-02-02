@@ -6,17 +6,19 @@ export CUBLAS_WORKSPACE_CONFIG=:16:8
 
 ### Llama-3-8B Config ###
 model_name_or_path=meta-llama/Meta-Llama-3-8B-Instruct
+model_name="Meta-Llama-3-8B-Instruct"
+
 lorra_alpha=10
 layers="10,20"
 transform_layers="-1"
 
-output_dir="/data2/xianglin/RobustSCoT/circuitbreaker/Llama-3-8b_CB"
+output_dir="/data2/xianglin/RobustSCoT/rr_outputs/${model_name}"
 
 echo "model_name_or_path=$model_name_or_path"
 echo "output_dir=$output_dir"
 
 accelerate launch --config_file src/Baselines/circuitbreaker/configs/accelerate_zero1.yaml \
-    --num_processes 1 --main_process_port $MASTER_PORT \
+    --main_process_port $MASTER_PORT \
     src/Baselines/circuitbreaker/main.py \
     --model_name_or_path $model_name_or_path \
     --target_layers $layers \
