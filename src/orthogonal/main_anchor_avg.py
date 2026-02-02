@@ -72,14 +72,17 @@ def main():
 
     # Stage 1: Prepare the dataset
     # prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
-    prob = 1.0
-    ultrachat_dataset = data_reader("ultrachat", prob)
-    xstest_dataset = data_reader("xstest", prob)
-    rr_dataset = data_reader("circuitbreaker-train-retain", prob)
-    
-    # Check if use_refusal_retain attribute exists
-    retain_dataset = ultrachat_dataset
-    refusal_dataset = rr_dataset+xstest_dataset
+    if data_args.dataset_name == "circuitbreaker":
+        prob = 1.0
+        ultrachat_dataset = data_reader("ultrachat", prob)
+        xstest_dataset = data_reader("xstest", prob)
+        rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+    elif data_args.dataset_name == "R2D-R1":
+        prob = 1.0
+        retain_dataset = data_reader("R2D-R1-benign", prob)
+        refusal_dataset = data_reader("R2D-R1-harmful", prob)
+    else:
+        raise ValueError(f"Unknown dataset name: {data_args.dataset_name}")
     
     # refusal / harmful loader
     refusal_train = ORTDataset(refusal_dataset, tokenizer, max_length=data_args.max_length)
@@ -131,7 +134,7 @@ def main():
     proj_scale = float(getattr(ort_args, "proj_scale", 1.0))
     one_sided  = bool(getattr(ort_args, "one_sided", True))
     eps = float(getattr(ort_args, "eps", 1e-12))
-    lam_u = float(getattr(ort_args, "lam_u", 0.1))  # retain loss weight（可后续做动态）
+    lam_u = float(getattr(ort_args, "lam_u", 5.0))  # retain loss weight（可后续做动态）
 
     # Create progress bar
     pbar = tqdm(total=total_steps, desc="Training", disable=not accelerator.is_main_process)

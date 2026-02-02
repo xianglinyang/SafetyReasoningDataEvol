@@ -19,7 +19,7 @@ from ort_train_dataset import ORTDataset, data_reader, ort_collate_fn
 from utils import save_tokenizer_and_model
 import logging
 from tqdm import tqdm
-from ort_opti import _clone_grads, _orth_perturb_first_step, OrthSAM, _norm2, _dot_list, _norm2_list, _grad_list, _clone_grad_list, _get_d
+from ort_opti import OrthSAM, _dot_list, _norm2_list, _clone_grad_list, _get_d
 import os
 import copy
 
@@ -72,11 +72,14 @@ def main():
     # Stage 1: Prepare the dataset
     # prob = 0.5 if "Llama" in model_args.model_name_or_path else 1.0
     prob = 1.0
-    rr_dataset = data_reader("circuitbreaker-train-retain", prob)
-    xstest_dataset = data_reader("xstest", prob)
-    
-    # Check if use_refusal_retain attribute exists
-    refusal_dataset = rr_dataset+xstest_dataset
+    if data_args.dataset_name == "circuitbreaker":
+        rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+        xstest_dataset = data_reader("xstest", prob)
+        refusal_dataset = rr_dataset+xstest_dataset
+    elif data_args.dataset_name == "R2D-R1":
+        refusal_dataset = data_reader("R2D-R1-harmful", prob)
+    else:
+        raise ValueError(f"Unknown dataset name: {data_args.dataset_name}")
     
     # refusal / harmful loader
     refusal_train = ORTDataset(refusal_dataset, tokenizer, max_length=data_args.max_length)
