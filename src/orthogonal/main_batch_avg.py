@@ -217,12 +217,17 @@ def main():
             optimizer.restore()
 
             # (5.1) dynamic lam_u using norm ratio (compute norms)
-            norm_u = torch.sqrt(_norm2(g_u_raw) + eps)
-            norm_h2 = torch.sqrt(_norm2([p.grad.detach() if p.grad is not None else None for p in trainable_params]) + eps)
-
-            lam_star = (tau * (norm_h2 / (norm_u + eps))).detach().item()
-            lam_star = max(lam_min, min(lam_max, lam_star))
-            lam_u = (1 - gamma) * lam_u + gamma * lam_star
+            norm2_u = _norm2(g_u_raw)
+            norm2_h2 = _norm2([p.grad.detach() if p.grad is not None else None for p in trainable_params])
+            
+            # Handle case when norms are None (all gradients are None)
+            if norm2_u is not None and norm2_h2 is not None:
+                norm_u = torch.sqrt(norm2_u + eps)
+                norm_h2 = torch.sqrt(norm2_h2 + eps)
+                
+                lam_star = (tau * (norm_h2 / (norm_u + eps))).detach().item()
+                lam_star = max(lam_min, min(lam_max, lam_star))
+                lam_u = (1 - gamma) * lam_u + gamma * lam_star
 
             # (6) add weighted retain grads onto current grads
             with torch.no_grad():

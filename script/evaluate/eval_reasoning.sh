@@ -15,9 +15,11 @@ model_name_or_path_list=(
     # "cais/zephyr_7b_r2d2"
     # "meta-llama/Meta-Llama-3-8B-Instruct"
 
-    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-anchor-avg"
-    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-circuitbreaker-ort-wo-retain"
-    "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-anchor-avg"
+    # "meta-llama/Llama-2-13b-chat-hf"
+    # "thu-ml/STAIR-Llama-3.1-8B-SFT"
+    # "/data2/xianglin/RobustSCoT/rr_outputs/Meta-Llama-3-8B-Instruct"
+    # "/data2/xianglin/RobustSCoT/sam_outputs/Meta-Llama-3-8B-circuitbreaker-sam"
+    "/data2/xianglin/RobustSCoT/sam_outputs/Meta-Llama-3-8B-R2D-R1-sam"
 )
 dataset_name_list=(
     "mmlu"

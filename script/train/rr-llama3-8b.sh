@@ -3,6 +3,7 @@
 export WANDB_MODE=offline
 export MASTER_PORT=$((29000 + RANDOM % 1000))
 export CUBLAS_WORKSPACE_CONFIG=:16:8
+export CUDA_VISIBLE_DEVICES=1
 
 # Get the directory of this script and find project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -28,6 +29,7 @@ echo "model_name_or_path=$model_name_or_path"
 echo "output_dir=$output_dir"
 
 accelerate launch --config_file src/Baselines/circuitbreaker/configs/accelerate_zero1.yaml \
+    --num_processes 1 \
     --main_process_port $MASTER_PORT \
     src/Baselines/circuitbreaker/main.py \
     --model_name_or_path $model_name_or_path \

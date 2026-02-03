@@ -19,6 +19,11 @@ mkdir -p ${OUTPUTS_PATH}/ort_outputs
 MODEL_NAME="Meta-Llama-3-8B"
 MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
 DATASET_NAME="R2D-R1"
+# MODEL_NAME="Meta-Llama-3-8B"
+# MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
+# DATASET_NAME="circuitbreaker"
+# --multi_gpu \
+# --num_processes 2 \
 
 accelerate launch \
     --num_processes 1 \
@@ -32,7 +37,7 @@ accelerate launch \
     --num_train_epochs 2 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
-    --learning_rate 5e-5 \
+    --learning_rate 1e-4 \
     --lr_scheduler_type cosine \
     --warmup_ratio 0.05 \
     --report_to none \
@@ -42,9 +47,9 @@ accelerate launch \
     --r 64 \
     --lora_alpha 64 \
     --lora_dropout 0.05 \
-    --modules_to_save embed_tokens lm_head \
+    --modules_to_save lm_head \
     --target_modules q_proj k_proj v_proj up_proj down_proj \
-    --rho 0.05 \
+    --rho 0.01 \
     --adaptive False \
     --orth_sam_max_grad_norm 1.0 \
     --lam_u 5.0 \

@@ -145,7 +145,7 @@ def main():
     val_dataset = circuitbreaker_val_dataset
 
     train_dataset = CircuitBreakerDataset(refusal_dataset, retain_dataset, tokenizer, model_name_or_path, max_length=1024)
-    val_dataset = CircuitBreakerDataset(refusal_dataset, val_dataset, tokenizer, model_name_or_path, max_length=1024)
+    val_dataset = CircuitBreakerDataset(val_dataset, val_dataset, tokenizer, model_name_or_path, max_length=1024)
 
     print("TRAIN LEN: ", len(train_dataset))
     print("VAL LEN: ", len(val_dataset))

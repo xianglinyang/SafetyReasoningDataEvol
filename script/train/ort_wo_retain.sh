@@ -15,9 +15,8 @@ mkdir -p ${OUTPUTS_PATH}/ort_outputs
 
 MODEL_NAME="Meta-Llama-3-8B"
 MODEL_NAME_OR_PATH="meta-llama/Meta-Llama-3-8B-Instruct"
-DATASET_NAME="circuitbreaker"
-# --multi_gpu \
-# --num_processes 2 \
+DATASET_NAME="R2D-R1"
+
 accelerate launch \
     --num_processes 1 \
     --mixed_precision bf16 \
@@ -27,7 +26,7 @@ accelerate launch \
     --use_lora \
     --output_dir ${OUTPUTS_PATH}/ort_outputs/${MODEL_NAME}-${DATASET_NAME}-ort-wo-retain \
     --bf16 \
-    --num_train_epochs 1 \
+    --num_train_epochs 2 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --learning_rate 5e-5 \
