@@ -3,7 +3,7 @@ per_gpu_jobs_num=1
 
 gpu_num=1
 jobs_num=$((per_gpu_jobs_num*gpu_num))
-gpu_ids=(1)
+gpu_ids=(0)
 
 # Configuration for GPU usage
 # Set to "single" to use one GPU for both inference and eval
@@ -20,41 +20,15 @@ model_name_or_path_list=(
 
     # "cais/zephyr_7b_r2d2"
 
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-CR-CoT-ablation/checkpoint-873" # reasoning ablation
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2-alpha64/checkpoint-435"
-
-
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-v2_20250428-003555/checkpoint-303"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-retain-ablation/checkpoint-450"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-variants-ablation/checkpoint-150"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/mistral-7b-reasoning-ablation/checkpoint-225"
-
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b_20250423-004757/checkpoint-900"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-retain-ablation/checkpoint-450"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-variants-ablation/checkpoint-225"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-reasoning-ablation/checkpoint-450"
-    # "meta-llama/Llama-2-13b-chat-hf"
-    # "/mnt/hdd1/ljiahao/xianglin/SCoT/outputs/circuitbreaker/llama2-13b_20250727-095351/checkpoint-194"
-
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-random-demo"
     # "/mnt/hdd1/ljiahao/xianglin/SCoT/circuitbreaker/llama3-8b-half-size"
 
     # "thu-ml/STAIR-Llama-3.1-8B-SFT"
     # "thu-ml/STAIR-Llama-3.1-8B-DPO-3"
-    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251219-165422/checkpoint-933"
-    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-933"
-    # "/data2/xianglin/RobustSCoT/circuitbreaker/llama3-8b_20251220-174526/checkpoint-1244"
-    # "/data2/xianglin/RobustSCoT/sam_outputs/Meta-Llama-3-8B-sam"
-    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-ablation"
-    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-wo-retain-ablation"
-    # "/data2/xianglin/RobustSCoT/ort_outputs/Llama-3.1-8B-ort"
+
     # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-anchor-avg"
-    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-R2D-R1-ort"
-    # "/data2/xianglin/RobustSCoT/r2d_outputs/Meta-Llama-3-8B-r2d"
-    "/data2/xianglin/RobustSCoT/ort_outputs/DeepSeek-R1-Distill-Qwen-7B-R2D-R1-ort"
-    # "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-    # "/data2/xianglin/RobustSCoT/r2d_outputs/DeepSeek-R1-Distill-Qwen-7B-r2d"
-    # ""
+    # "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-circuitbreaker-ort-wo-retain"
+    "/data2/xianglin/RobustSCoT/ort_outputs/Meta-Llama-3-8B-ort-anchor-avg"
 )
 dataset_name_list=(
     # "sorrybench"
@@ -70,7 +44,7 @@ dataset_name_list=(
 
     "wildjailbreak"
     # "XSafety"
-    # "PolyGuardMix"
+    "PolyGuardMix"
 
 )
 attack_name_list=(
@@ -180,7 +154,7 @@ prompt_cot_list=(0)
 header="python -m src.evaluate.evaluate_harmful"
 base_arguments="\
 --torch_type bf16 \
---eval_num 500"
+--eval_num 300"
 
 # Counter to distribute commands across GPUs
 counter=0
