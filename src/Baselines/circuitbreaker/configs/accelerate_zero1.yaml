@@ -14,7 +14,7 @@ main_training_function: main
 megatron_lm_config: {}
 mixed_precision: bf16
 num_machines: 1
-num_processes: 2
+num_processes: 1
 main_process_port: 29550
 rdzv_backend: static
 same_network: true

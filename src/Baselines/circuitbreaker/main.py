@@ -24,7 +24,7 @@ import torch
 import torch.distributed as dist
 import numpy as np
 import logging
-
+import random
 logger = logging.getLogger(__name__)
 
 
@@ -125,7 +125,8 @@ def main():
     if training_args.gradient_checkpointing:
         model.enable_input_require_grads()
 
-    prob = 0.5 if "meta-llama/Meta-Llama-3-8B-Instruct" in model_name_or_path else 1.0
+    # prob = 0.5 if "meta-llama/Meta-Llama-3-8B-Instruct" in model_name_or_path else 1.0
+    prob=1.0
     ultrachat_dataset = data_reader("ultrachat", prob)
     xstest_dataset = data_reader("xstest", prob)
     if training_args.use_refusal_retain:
@@ -134,6 +135,9 @@ def main():
     else: 
         retain_dataset = ultrachat_dataset + xstest_dataset
     
+    # shuffle
+    random.shuffle(retain_dataset)
+    
     circuitbreaker_train_cb_dataset = data_reader("circuitbreaker-train-cb", prob)
     circuitbreaker_val_dataset = data_reader("circuitbreaker-val", prob)
 
@@ -141,7 +145,7 @@ def main():
     val_dataset = circuitbreaker_val_dataset
 
     train_dataset = CircuitBreakerDataset(refusal_dataset, retain_dataset, tokenizer, model_name_or_path, max_length=1024)
-    val_dataset = CircuitBreakerDataset(refusal_dataset, retain_dataset, tokenizer, model_name_or_path, max_length=1024)
+    val_dataset = CircuitBreakerDataset(refusal_dataset, val_dataset, tokenizer, model_name_or_path, max_length=1024)
 
     print("TRAIN LEN: ", len(train_dataset))
     print("VAL LEN: ", len(val_dataset))

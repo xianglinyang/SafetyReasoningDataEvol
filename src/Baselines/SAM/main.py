@@ -120,11 +120,11 @@ def main():
 
     pbar = tqdm(total=total_steps, desc="Training", disable=not accelerator.is_main_process)
     
+    retain_iter = iter(retain_loader)
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         epoch_loss_sam = 0.0
         num_batches = 0
-        retain_iter = iter(retain_loader)
         
         for refusal_batch in refusal_loader:
             try:

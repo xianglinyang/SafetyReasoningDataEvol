@@ -100,27 +100,34 @@ def _orth_perturb_first_step(
         g_perp = g_h
     else:
         gh_dot_gu = _dot(g_h, g_u)
-        coef = gh_dot_gu / (gu_n2 + eps)     # tensor scalar
-        alpha = float(coef.detach().item())
-
-        # one-sided gate: only remove if it pushes "along" g_u direction
-        do_proj = (not one_sided) or (alpha > 0.0)
-
-        if do_proj:
-            coef_eff = proj_scale * coef
-            alpha_eff = float((proj_scale * coef).detach().item())
-            g_perp = []
-            for gh_i, gu_i in zip(g_h, g_u):
-                if gh_i is None:
-                    g_perp.append(None)
-                elif gu_i is None:
-                    g_perp.append(gh_i)
-                else:
-                    g_perp.append(gh_i - coef_eff * gu_i)
-        else:
-            # don't project
+        # Check if gh_dot_gu is None (happens when g_h and g_u have no overlapping non-None gradients)
+        if gh_dot_gu is None:
+            # Fall back to using g_h directly
             g_perp = g_h
+            alpha = 0.0
             alpha_eff = 0.0
+        else:
+            coef = gh_dot_gu / (gu_n2 + eps)     # tensor scalar
+            alpha = float(coef.detach().item())
+
+            # one-sided gate: only remove if it pushes "along" g_u direction
+            do_proj = (not one_sided) or (alpha > 0.0)
+
+            if do_proj:
+                coef_eff = proj_scale * coef
+                alpha_eff = float((proj_scale * coef).detach().item())
+                g_perp = []
+                for gh_i, gu_i in zip(g_h, g_u):
+                    if gh_i is None:
+                        g_perp.append(None)
+                    elif gu_i is None:
+                        g_perp.append(gh_i)
+                    else:
+                        g_perp.append(gh_i - coef_eff * gu_i)
+            else:
+                # don't project
+                g_perp = g_h
+                alpha_eff = 0.0
 
     # if g_perp is ~0, fallback
     gp_n2 = _norm2(g_perp)
