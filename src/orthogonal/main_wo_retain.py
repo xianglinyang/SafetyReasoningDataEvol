@@ -74,8 +74,7 @@ def main():
     prob = 1.0
     if data_args.dataset_name == "circuitbreaker":
         rr_dataset = data_reader("circuitbreaker-train-retain", prob)
-        xstest_dataset = data_reader("xstest", prob)
-        refusal_dataset = rr_dataset+xstest_dataset
+        refusal_dataset = rr_dataset
     elif data_args.dataset_name == "R2D-R1":
         refusal_dataset = data_reader("R2D-R1-harmful", prob)
     else:
