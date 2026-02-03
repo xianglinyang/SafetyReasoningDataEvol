@@ -38,7 +38,6 @@ accelerate launch \
     --r 32 \
     --lora_alpha 32 \
     --lora_dropout 0.05 \
-    --modules_to_save lm_head \
     --target_modules q_proj k_proj v_proj up_proj down_proj \
     --rho 0.01 \
     --adaptive False \

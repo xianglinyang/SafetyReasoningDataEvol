@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 # Get the directory of this script and find project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -27,7 +27,7 @@ accelerate launch \
     --use_lora \
     --output_dir ${OUTPUTS_PATH}/sam_outputs/${MODEL_NAME}-${DATASET_NAME}-sam \
     --bf16 \
-    --num_train_epochs 1 \
+    --num_train_epochs 3 \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --learning_rate 5e-5 \
@@ -37,11 +37,11 @@ accelerate launch \
     --gradient_checkpointing \
     --ddp_find_unused_parameters False \
     --logging_steps 10 \
-    --r 32 \
-    --lora_alpha 32 \
+    --r 64 \
+    --lora_alpha 64 \
     --lora_dropout 0.05 \
-    --modules_to_save lm_head \
+    --modules_to_save embed_tokens lm_head \
     --target_modules q_proj k_proj v_proj up_proj down_proj \
-    --rho 0.01 \
+    --rho 0.05 \
     --adaptive False \
     --sam_max_grad_norm 1.0 \
