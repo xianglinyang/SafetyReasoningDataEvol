@@ -22,7 +22,7 @@ from tqdm import tqdm
 from ort_opti import _clone_grads, _orth_perturb_first_step, OrthSAM, _norm2
 import os
 import copy
-
+import random
 logger = logging.getLogger(__name__)
 
 
@@ -87,14 +87,16 @@ def main():
         ultrachat_dataset = data_reader("ultrachat", prob)
         xstest_dataset = data_reader("xstest", prob)
         rr_dataset = data_reader("circuitbreaker-train-retain", prob)
-        retain_dataset = ultrachat_dataset
-        refusal_dataset = rr_dataset+xstest_dataset
+        retain_dataset = ultrachat_dataset + xstest_dataset
+        refusal_dataset = rr_dataset
     elif data_args.dataset_name == "R2D-R1":
         retain_dataset = data_reader("R2D-R1-benign", prob)
         refusal_dataset = data_reader("R2D-R1-harmful", prob)
     
     else:
         raise ValueError(f"Unknown dataset name: {data_args.dataset_name}")
+    random.shuffle(refusal_dataset)
+    random.shuffle(retain_dataset)
 
     # refusal / harmful loader
     refusal_train = ORTDataset(refusal_dataset, tokenizer, max_length=data_args.max_length)

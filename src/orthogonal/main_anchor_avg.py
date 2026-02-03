@@ -1,4 +1,5 @@
 import torch
+import random
 from torch.utils.data import DataLoader
 from accelerate import Accelerator
 from transformers import (
@@ -77,12 +78,17 @@ def main():
         ultrachat_dataset = data_reader("ultrachat", prob)
         xstest_dataset = data_reader("xstest", prob)
         rr_dataset = data_reader("circuitbreaker-train-retain", prob)
+        retain_dataset = ultrachat_dataset + xstest_dataset
+        refusal_dataset = rr_dataset
     elif data_args.dataset_name == "R2D-R1":
         prob = 1.0
         retain_dataset = data_reader("R2D-R1-benign", prob)
         refusal_dataset = data_reader("R2D-R1-harmful", prob)
     else:
         raise ValueError(f"Unknown dataset name: {data_args.dataset_name}")
+    
+    random.shuffle(refusal_dataset)
+    random.shuffle(retain_dataset)
     
     # refusal / harmful loader
     refusal_train = ORTDataset(refusal_dataset, tokenizer, max_length=data_args.max_length)

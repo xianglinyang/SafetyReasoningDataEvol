@@ -31,7 +31,7 @@ def data_reader(dataset_name: str, prob=1.0):
                     message = messages[:2]
                     message[0]['content'] = ""
                     orig_s.append(message)
-            if len(orig_s) >= 10000:
+            if len(orig_s) >= 2000:
                 break
 
         random.shuffle(orig_s)
@@ -44,7 +44,7 @@ def data_reader(dataset_name: str, prob=1.0):
             data = [row for row in data if row['final_label'] == "1_full_compliance"]
         
         borderline_orig_s = []
-        for i, d in enumerate(data):
+        for i, d in enumerate(data * 50):
             prompt = d['prompt']
             completion = d['completion']
             
